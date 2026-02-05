@@ -93,7 +93,7 @@ export default function ScannerPage() {
     
     try {
       const base64Data = imageBase64.split(',')[1];
-      const response = await fetch('http://localhost:8000/api/v1/ingredients/scan', {
+      const response = await fetch('http://localhost:8000/api/v1/ingredients/scan-base64', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

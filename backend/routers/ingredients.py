@@ -10,11 +10,25 @@ from models.schemas import IngredientCreate, IngredientResponse
 router = APIRouter()
 supabase = get_supabase_client()
 
-@router.post("/scan", response_model=List[IngredientResponse])
+@router.post("/scan", response_model=List[dict])
 async def scan_ingredients(image: UploadFile = File(...)):
     try:
         contents = await image.read()
         image_data = base64.b64encode(contents).decode("utf-8")
+        
+        ingredients = await analyze_ingredients_image(image_data)
+        
+        return ingredients
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/scan-base64", response_model=List[dict])
+async def scan_ingredients_base64(request: dict):
+    try:
+        image_data = request.get("image", "")
+        
+        if not image_data:
+            raise HTTPException(status_code=400, detail="Missing image data")
         
         ingredients = await analyze_ingredients_image(image_data)
         
