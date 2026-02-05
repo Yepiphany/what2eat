@@ -119,7 +119,7 @@ async def create_session(recipe_id: str, user_id: str) -> CookingSessionResponse
             steps = [
                 CookingStep(
                     step_number=1,
-                    "按照菜谱步骤进行烹饪",
+                    instruction="按照菜谱步骤进行烹饪",
                     duration_seconds=None
                 )
             ]

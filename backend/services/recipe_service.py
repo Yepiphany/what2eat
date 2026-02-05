@@ -7,7 +7,21 @@ from openai import OpenAI
 
 load_dotenv()
 
-openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# 使用 ModelScope AI API (Moonshot AI Kimi)
+base_url = os.getenv("MODELSCOPE_BASE_URL", "https://api-inference.modelscope.cn/v1")
+api_key = os.getenv("MODELSCOPE_API_KEY", "")
+
+model_scope_client = OpenAI(
+    base_url=base_url,
+    api_key=api_key
+)
+
+# 备用的 OpenAI 客户端（如果 ModelScope 不可用）
+openai_api_key = os.getenv("OPENAI_API_KEY")
+if openai_api_key:
+    openai_client = OpenAI(api_key=openai_api_key)
+else:
+    openai_client = None
 
 SAMPLE_RECIPES = [
     {
@@ -115,13 +129,16 @@ SAMPLE_RECIPES = [
     }
 ]
 
-async def recommend_recipes(
+def recommend_recipes(
     available_ingredients: List[str],
     taste_preferences: List[TastePreference] = None,
     diet_type: Optional[DietType] = None,
     max_cooking_time: Optional[int] = None,
     max_difficulty: Optional[RecipeDifficulty] = None
 ) -> List[Dict]:
+    """
+    根据可用食材推荐菜谱
+    """
     try:
         filtered_recipes = []
         
@@ -155,7 +172,7 @@ async def recommend_recipes(
         filtered_recipes.sort(key=lambda x: x["match_percentage"], reverse=True)
         
         if not filtered_recipes and available_ingredients:
-            ai_recommendation = await get_ai_recipe_recommendation(
+            ai_recommendation = get_ai_recipe_recommendation(
                 available_ingredients, taste_preferences, diet_type
             )
             if ai_recommendation:
@@ -167,17 +184,21 @@ async def recommend_recipes(
         print(f"Recipe recommendation error: {e}")
         return []
 
-async def get_ai_recipe_recommendation(
+def get_ai_recipe_recommendation(
     ingredients: List[str],
     taste_preferences: List[TastePreference] = None,
     diet_type: Optional[DietType] = None
 ) -> Optional[Dict]:
+    """
+    使用 ModelScope AI 生成智能菜谱推荐
+    """
     try:
+        model = os.getenv("MODELSCOPE_VISION_MODEL", "moonshotai/Kimi-K2.5")
         taste_str = ", ".join([t.value for t in taste_preferences]) if taste_preferences else "任意"
         diet_str = diet_type.value if diet_type else "任意"
         
-        response = openai_client.chat.completions.create(
-            model="gpt-4o",
+        response = model_scope_client.chat.completions.create(
+            model=model,
             messages=[
                 {
                     "role": "system",
@@ -217,6 +238,92 @@ async def get_ai_recipe_recommendation(
 请推荐一道合适的菜品"""
                 }
             ],
+            max_tokens=800
+        )
+        
+        content = response.choices[0].message.content
+        
+        try:
+            result = json.loads(content)
+        except json.JSONDecodeError:
+            result = {
+                "id": "ai_recipe_1",
+                "title": "智能推荐菜",
+                "description": "根据您的食材推荐",
+                "ingredients": ingredients[:5],
+                "steps": ["按照个人习惯烹饪"],
+                "cooking_time": 30,
+                "difficulty": "easy",
+                "taste_tags": ["mild"],
+                "diet_types": ["normal"],
+                "calories": 300,
+                "servings": 2
+            }
+        
+        available_set = set(ingredients)
+        recipe_ingredients = set(result.get("ingredients", []))
+        matched = recipe_ingredients & available_set
+        result["matched_ingredients"] = list(matched)
+        result["missing_ingredients"] = list(recipe_ingredients - available_set)
+        result["match_percentage"] = round(len(matched) / len(recipe_ingredients) * 100, 1) if recipe_ingredients else 0
+        
+        return result
+    
+    except Exception as e:
+        print(f"ModelScope AI recipe generation error: {e}")
+        
+        # 如果 ModelScope 失败，尝试使用 OpenAI
+        if openai_client:
+            print("尝试使用 OpenAI 作为备选...")
+            return get_ai_recipe_with_openai(ingredients, taste_preferences, diet_type)
+        
+        return None
+
+def get_ai_recipe_with_openai(
+    ingredients: List[str],
+    taste_preferences: List[TastePreference] = None,
+    diet_type: Optional[DietType] = None
+) -> Optional[Dict]:
+    """备用的 OpenAI 菜谱生成方法"""
+    try:
+        taste_str = ", ".join([t.value for t in taste_preferences]) if taste_preferences else "任意"
+        diet_str = diet_type.value if diet_type else "任意"
+        
+        response = openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": """你是一个专业厨师。请根据用户提供的食材推荐一道合适的菜品。
+
+返回JSON格式：
+{
+    "id": "ai_recipe_1",
+    "title": "菜品名称",
+    "description": "简短描述",
+    "ingredients": ["主料", "辅料1", "辅料2", "调料1", "调料2"],
+    "steps": ["步骤1", "步骤2", "步骤3"],
+    "cooking_time": 预计烹饪时间,
+    "difficulty": "easy/medium/hard",
+    "taste_tags": ["口味标签1", "口味标签2"],
+    "diet_types": ["适合的饮食类型"],
+    "calories": 预估卡路里,
+    "servings": 份量,
+    "matched_ingredients": ["匹配的食材"],
+    "missing_ingredients": ["缺少的食材"],
+    "match_percentage": 匹配度（0-100）
+}
+
+只返回JSON，不要其他文字
+"""
+                },
+                {
+                    "role": "user",
+                    "content": f"""现有食材: {', '.join(ingredients)}
+口味偏好: {taste_str}
+饮食限制: {diet_str}"""
+                }
+            ],
             max_tokens=800,
             response_format={"type": "json_object"}
         )
@@ -228,16 +335,19 @@ async def get_ai_recipe_recommendation(
         recipe_ingredients = set(result.get("ingredients", []))
         matched = recipe_ingredients & available_set
         result["matched_ingredients"] = list(matched)
-        result["missing_ingredients"] = list(recipe_ingredients - matched)
+        result["missing_ingredients"] = list(recipe_ingredients - available_set)
         result["match_percentage"] = round(len(matched) / len(recipe_ingredients) * 100, 1) if recipe_ingredients else 0
         
         return result
     
     except Exception as e:
-        print(f"AI recipe generation error: {e}")
+        print(f"OpenAI fallback error: {e}")
         return None
 
-async def generate_shopping_list(recipe_id: str, user_ingredients: List[str]) -> Dict:
+def generate_shopping_list(recipe_id: str, user_ingredients: List[str]) -> Dict:
+    """
+    生成购物清单
+    """
     try:
         recipe = next((r for r in SAMPLE_RECIPES if r["id"] == recipe_id), None)
         
@@ -246,35 +356,13 @@ async def generate_shopping_list(recipe_id: str, user_ingredients: List[str]) ->
         
         needed = set(recipe["ingredients"]) - set(user_ingredients)
         
-        response = openai_client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {
-                    "role": "system",
-                    "content": """你是一个购物助手。请根据用户缺少的食材生成购物清单。
-
-返回JSON格式：
-{
-    "shopping_list": [
-        {"item": "食材名称", "quantity": 数量, "unit": 单位, "priority": "high/medium/low"}
-    ],
-    "tips": ["购买建议1", "购买建议2"]
-}
-
-只返回JSON，不要其他文字
-"""
-                },
-                {
-                    "role": "user",
-                    "content": f"缺少的食材: {', '.join(needed)}"
-                }
+        return {
+            "shopping_list": [
+                {"item": item, "quantity": 1, "unit": "份", "priority": "high"}
+                for item in needed
             ],
-            max_tokens=400,
-            response_format={"type": "json_object"}
-        )
-        
-        content = response.choices[0].message.content
-        return json.loads(content)
+            "tips": ["建议购买新鲜的食材", "可以一次多买一些"]
+        }
     
     except Exception as e:
         print(f"Shopping list generation error: {e}")
