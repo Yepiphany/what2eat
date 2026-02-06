@@ -1,11 +1,12 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Scan, Utensils, User } from 'lucide-react';
+import { Home, Scan, Utensils, User, ShoppingCart } from 'lucide-react';
 import { useAppStore } from '../stores';
 
 const navItems = [
   { path: '/', icon: Home, label: '首页' },
   { path: '/scanner', icon: Scan, label: '扫描' },
   { path: '/recipes', icon: Utensils, label: '菜谱' },
+  { path: '/shopping', icon: ShoppingCart, label: '采购' },
   { path: '/profile', icon: User, label: '我的' },
 ];
 
@@ -19,6 +20,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     if (path === '/scanner') return 'scanner';
     if (path.startsWith('/recipes') && !path.includes('/cooking')) return 'recipes';
     if (path.startsWith('/cooking')) return 'cooking';
+    if (path === '/shopping') return 'shopping';
     if (path === '/profile') return 'profile';
     return 'home';
   };

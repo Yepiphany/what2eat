@@ -1,19 +1,75 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Scan, Utensils, ChefHat, ArrowRight, Sparkles, Plus, X } from 'lucide-react';
+import { Scan, Utensils, ChefHat, ArrowRight, Sparkles, Plus, X, ShoppingCart, Check } from 'lucide-react';
 import { useIngredientsStore, useRecipesStore } from '../stores';
-import { ingredientApi } from '../services/api';
+import { ingredientApi, recipeApi } from '../services/api';
 import type { Ingredient } from '../types';
 
 export default function HomePage() {
   const { ingredients, addIngredient, setIngredients, removeIngredient } = useIngredientsStore();
-  const { recommendations } = useRecipesStore();
+  const { recommendations, setRecommendations } = useRecipesStore();
   const [showAddForm, setShowAddForm] = useState(false);
   const [newIngredient, setNewIngredient] = useState({ name: '', quantity: 1, unit: '个', category: 'other' });
   const [isAdding, setIsAdding] = useState(false);
+  const [shoppingLists, setShoppingLists] = useState<any[]>([]);
+  const [isLoadingRecipes, setIsLoadingRecipes] = useState(false);
 
   const expiringSoon = ingredients.filter(ing => ing.is_expiring_soon);
   const hasIngredients = ingredients.length > 0;
+
+  useEffect(() => {
+    loadShoppingLists();
+  }, []);
+
+  useEffect(() => {
+    if (hasIngredients && recommendations.length === 0 && !isLoadingRecipes) {
+      loadRecommendations();
+    }
+  }, [hasIngredients, recommendations.length]);
+
+  const loadRecommendations = async () => {
+    setIsLoadingRecipes(true);
+    try {
+      const request = {
+        available_ingredients: ingredients.map(ing => ing.name),
+        force_refresh: false,
+      };
+      const recipes = await recipeApi.getRecommendations(request);
+      setRecommendations(recipes);
+    } catch (error) {
+      console.error('Failed to load recommendations:', error);
+    } finally {
+      setIsLoadingRecipes(false);
+    }
+  };
+
+  const loadShoppingLists = async () => {
+    try {
+      const lists = await recipeApi.getShoppingLists('pending');
+      setShoppingLists(lists);
+    } catch (error) {
+      console.error('Failed to load shopping lists:', error);
+    }
+  };
+
+  const getItemName = (item: any): string => {
+    if (typeof item === 'object' && item !== null) {
+      return item.name || '';
+    }
+    return item || '';
+  };
+
+  const getItemCompleted = (item: any): boolean => {
+    if (typeof item === 'object' && item !== null) {
+      return item.completed === true;
+    }
+    return false;
+  };
+
+  const pendingPurchaseCount = shoppingLists.reduce((count, list) => {
+    const pendingItems = list.items.filter((item: any) => !getItemCompleted(item));
+    return count + pendingItems.length;
+  }, 0);
 
   const handleAddIngredient = async () => {
     if (!newIngredient.name.trim()) return;
@@ -111,10 +167,10 @@ export default function HomePage() {
             <h2 className="text-xl font-semibold text-gray-800">我的食材库存</h2>
             <button
               onClick={() => setShowAddForm(true)}
-              className="flex items-center space-x-1 text-primary-600 hover:text-primary-700 font-medium text-sm"
+              className="flex items-center space-x-1 px-3 py-1.5 bg-primary-500 text-white text-sm rounded-lg hover:bg-primary-600 transition-colors"
             >
-              <Plus size={16} />
-              <span>添加食材</span>
+              <Plus size={14} />
+              <span>手动添加</span>
             </button>
           </div>
           
@@ -226,28 +282,51 @@ export default function HomePage() {
           </div>
 
           {recommendations.length > 0 && (
-            <div className="mt-6 pt-6 border-t">
-              <h3 className="font-semibold text-gray-800 mb-3">今日推荐</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {recommendations.slice(0, 2).map((recipe) => (
-                  <Link
-                    key={recipe.id}
-                    to={`/recipes/${recipe.id}`}
-                    className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-                  >
-                    <div className="w-16 h-16 bg-gradient-to-br from-primary-400 to-primary-600 rounded-lg flex items-center justify-center text-white text-2xl">
-                      🍳
+            <section className="mt-8">
+              <Link to="/shopping" className="flex items-center justify-between group">
+                <h2 className="text-xl font-semibold text-gray-800 group-hover:text-primary-600 transition-colors">我的采购清单</h2>
+                <span className="text-primary-600 text-sm opacity-0 group-hover:opacity-100 transition-opacity">进入 →</span>
+              </Link>
+              
+              {shoppingLists.length > 0 ? (
+                <div className="space-y-4 mt-4">
+                  {shoppingLists.slice(0, 3).map((list) => (
+                    <div key={list.id} className="p-4 bg-orange-50 rounded-lg">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <ShoppingCart size={16} className="text-orange-600" />
+                        <Link
+                          to={`/recipes/${list.recipe_id}`}
+                          className="font-medium text-gray-800 hover:text-primary-600"
+                        >
+                          {list.recipe_title || '未知菜谱'}
+                        </Link>
+                      </div>
+                      <div className="space-y-1">
+                        {list.items.slice(0, 3).map((item: any, idx: number) => (
+                          <div key={idx} className="flex items-center space-x-2 text-sm">
+                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                              getItemCompleted(item)
+                                ? 'bg-green-500 border-green-500'
+                                : 'border-orange-300'
+                            }`}>
+                              {getItemCompleted(item) && <Check size={10} className="text-white" />}
+                            </div>
+                            <span className={getItemCompleted(item) ? 'text-gray-400 line-through' : 'text-gray-700'}>
+                              {getItemName(item)}
+                            </span>
+                          </div>
+                        ))}
+                        {list.items.length > 3 && (
+                          <p className="text-xs text-gray-500">等 {list.items.length} 项</p>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <h4 className="font-medium text-gray-800">{recipe.title}</h4>
-                      <p className="text-sm text-gray-500">
-                        {recipe.match_percentage}% 匹配度 · {recipe.cooking_time}分钟
-                      </p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 text-sm mt-4">暂无待采购的食材</p>
+              )}
+            </section>
           )}
         </section>
       )}
@@ -306,9 +385,9 @@ export default function HomePage() {
             </div>
             <div>
               <div className="text-2xl font-bold text-purple-600">
-                {recommendations[0]?.match_percentage?.toFixed(0) || 0}%
+                {pendingPurchaseCount}
               </div>
-              <div className="text-sm text-gray-500">最高匹配</div>
+              <div className="text-sm text-gray-500">待采购</div>
             </div>
           </div>
         </div>

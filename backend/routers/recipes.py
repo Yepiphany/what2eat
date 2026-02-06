@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Request
 from typing import List, Optional
 from pydantic import BaseModel
-from services.recipe_service import enhance_recipe_with_matching, generate_recipe_id
+from services.recipe_service import enhance_recipe_with_matching, generate_recipe_id, get_recipe_from_database
 
 router = APIRouter()
 
@@ -13,6 +13,7 @@ async def get_recipe_recommendations(request: Request):
     available_ingredients = data.get('available_ingredients', [])
     taste_preferences = data.get('taste_preferences', [])
     diet_type = data.get('diet_type', None)
+    force_refresh = data.get('force_refresh', False)
     
     if not available_ingredients:
         return []
@@ -23,7 +24,8 @@ async def get_recipe_recommendations(request: Request):
         available_ingredients=available_ingredients,
         taste_preferences=taste_preferences,
         diet_type=diet_type,
-        count=10
+        count=10,
+        force_refresh=force_refresh
     )
     return recipes
 
@@ -48,23 +50,12 @@ async def get_batch_recipes(request: Request):
 
 @router.get("/{recipe_id}")
 async def get_recipe(recipe_id: str):
-    return {
-        "id": recipe_id,
-        "title": "示例菜谱",
-        "description": "菜谱详情",
-        "ingredients": ["食材1", "食材2"],
-        "steps": ["步骤1", "步骤2"],
-        "cooking_time": 30,
-        "difficulty": "easy",
-        "taste_tags": ["mild"],
-        "diet_types": ["normal"],
-        "calories": 300,
-        "servings": 2,
-        "matched_ingredients": [],
-        "missing_ingredients": [],
-        "match_percentage": 0,
-        "image_url": None
-    }
+    recipe = get_recipe_from_database(recipe_id)
+    
+    if recipe:
+        return recipe
+    
+    raise HTTPException(status_code=404, detail="菜谱不存在")
 
 @router.get("/")
 async def get_recipes():

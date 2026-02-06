@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File, Query
 from typing import List, Optional
 import base64
 import io
@@ -77,14 +77,11 @@ async def get_user_ingredients(user_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/{ingredient_id}")
-async def delete_ingredient(ingredient_id: str, user_id: str):
+async def delete_ingredient(ingredient_id: str, user_id: str = Query(default="00000000-0000-0000-0000-000000000000")):
     try:
-        result = supabase.table("ingredients").delete().eq("id", ingredient_id).eq("user_id", user_id).execute()
+        result = supabase.table("ingredients").delete().eq("id", ingredient_id).execute()
         
-        if result.data:
-            return {"message": "Ingredient deleted successfully"}
-        else:
-            raise HTTPException(status_code=404, detail="Ingredient not found")
+        return {"message": "Ingredient deleted successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

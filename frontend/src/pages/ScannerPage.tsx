@@ -13,6 +13,9 @@ export default function ScannerPage() {
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [detectedIngredients, setDetectedIngredients] = useState<Partial<Ingredient>[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newIngredient, setNewIngredient] = useState({ name: '', quantity: 1, unit: '个', category: 'other' });
+  const [isAdding, setIsAdding] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -53,6 +56,23 @@ export default function ScannerPage() {
       removeIngredient(ingredientId);
     } catch (err) {
       console.error('Failed to delete ingredient:', err);
+    }
+  };
+
+  const handleAddIngredient = async () => {
+    if (!newIngredient.name.trim()) return;
+    
+    setIsAdding(true);
+    try {
+      const userId = localStorage.getItem('user_id') || '00000000-0000-0000-0000-000000000000';
+      const saved = await ingredientApi.addIngredient(newIngredient as Partial<Ingredient>, userId);
+      addIngredient(saved);
+      setNewIngredient({ name: '', quantity: 1, unit: '个', category: 'other' });
+      setShowAddForm(false);
+    } catch (err) {
+      console.error('Failed to add ingredient:', err);
+    } finally {
+      setIsAdding(false);
     }
   };
 
@@ -307,7 +327,91 @@ export default function ScannerPage() {
             <h3 className="text-lg font-semibold text-gray-800">
               全部食材 ({ingredients.length} 种)
             </h3>
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="flex items-center space-x-1 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
+            >
+              <Plus size={18} />
+              <span>手动添加</span>
+            </button>
           </div>
+
+          {showAddForm && (
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="flex items-end space-x-3">
+                <div className="flex-1">
+                  <label className="block text-sm text-gray-600 mb-1">食材名称</label>
+                  <input
+                    type="text"
+                    value={newIngredient.name}
+                    onChange={(e) => setNewIngredient(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="输入食材名称"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+                <div className="w-20">
+                  <label className="block text-sm text-gray-600 mb-1">数量</label>
+                  <input
+                    type="number"
+                    value={newIngredient.quantity}
+                    onChange={(e) => setNewIngredient(prev => ({ ...prev, quantity: parseFloat(e.target.value) || 1 }))}
+                    min="1"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-center"
+                  />
+                </div>
+                <div className="w-20">
+                  <label className="block text-sm text-gray-600 mb-1">单位</label>
+                  <select
+                    value={newIngredient.unit}
+                    onChange={(e) => setNewIngredient(prev => ({ ...prev, unit: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                  >
+                    <option value="个">个</option>
+                    <option value="斤">斤</option>
+                    <option value="克">克</option>
+                    <option value="千克">千克</option>
+                    <option value="毫升">毫升</option>
+                    <option value="升">升</option>
+                    <option value="把">把</option>
+                    <option value="根">根</option>
+                  </select>
+                </div>
+                <div className="w-28">
+                  <label className="block text-sm text-gray-600 mb-1">分类</label>
+                  <select
+                    value={newIngredient.category}
+                    onChange={(e) => setNewIngredient(prev => ({ ...prev, category: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                  >
+                    <option value="vegetable">蔬菜</option>
+                    <option value="meat">肉类</option>
+                    <option value="seafood">海鲜</option>
+                    <option value="dairy">奶制品</option>
+                    <option value="egg">蛋类</option>
+                    <option value="grain">谷物</option>
+                    <option value="fruit">水果</option>
+                    <option value="seasoning">调味品</option>
+                    <option value="other">其他</option>
+                  </select>
+                </div>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => setShowAddForm(false)}
+                    className="p-2 text-gray-500 hover:bg-gray-200 rounded-lg"
+                  >
+                    <X size={20} />
+                  </button>
+                  <button
+                    onClick={handleAddIngredient}
+                    disabled={isAdding || !newIngredient.name.trim()}
+                    className="p-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-50"
+                  >
+                    <Check size={20} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           
           {ingredients.length === 0 ? (
             <div className="text-center py-12 text-gray-500">

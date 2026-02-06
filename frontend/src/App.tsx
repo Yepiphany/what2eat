@@ -6,6 +6,7 @@ import RecipesPage from './pages/RecipesPage';
 import RecipeDetailPage from './pages/RecipeDetailPage';
 import CookingPage from './pages/CookingPage';
 import ProfilePage from './pages/ProfilePage';
+import ShoppingPage from './pages/ShoppingPage';
 import Layout from './components/Layout';
 
 function ScrollToTop() {
@@ -28,6 +29,7 @@ function App() {
           <Route path="/recipes/:id" element={<RecipeDetailPage />} />
           <Route path="/cooking/:recipeId" element={<CookingPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/shopping" element={<ShoppingPage />} />
         </Routes>
       </Layout>
     </Router>

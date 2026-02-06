@@ -11,9 +11,10 @@ import {
   Share2,
   ChefHat,
   Check,
-  X
+  X,
+  Plus
 } from 'lucide-react';
-import { recipeApi, cookingApi } from '../services/api';
+import { recipeApi } from '../services/api';
 import { useCookingStore, useUserStore } from '../stores';
 import type { Recipe } from '../types';
 
@@ -40,6 +41,7 @@ export default function RecipeDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isInShoppingList, setIsInShoppingList] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
   
   const { currentSession, setSession } = useCookingStore();
   const { currentUser } = useUserStore();
@@ -62,6 +64,22 @@ export default function RecipeDetailPage() {
     }
   };
 
+  useEffect(() => {
+    if (recipe && id) {
+      checkShoppingList();
+    }
+  }, [recipe, id]);
+
+  const checkShoppingList = async () => {
+    try {
+      const lists = await recipeApi.getShoppingLists('pending');
+      const exists = lists.some((list: any) => list.recipe_id === id);
+      setIsInShoppingList(exists);
+    } catch (error) {
+      console.error('Failed to check shopping list:', error);
+    }
+  };
+
   const startCooking = async () => {
     if (!recipe || !currentUser) {
       navigate('/profile');
@@ -81,8 +99,22 @@ export default function RecipeDetailPage() {
     setIsFavorite(!isFavorite);
   };
 
-  const toggleShoppingList = () => {
-    setIsInShoppingList(!isInShoppingList);
+  const handleAddToShoppingList = async () => {
+    if (!recipe || !recipe.missing_ingredients || recipe.missing_ingredients.length === 0) {
+      return;
+    }
+
+    setIsAdding(true);
+    try {
+      await recipeApi.addToShoppingList(recipe.id, recipe.missing_ingredients, recipe.title);
+      setIsInShoppingList(true);
+      alert('已添加到采购清单');
+    } catch (error) {
+      console.error('Failed to add to shopping list:', error);
+      alert('添加失败，请重试');
+    } finally {
+      setIsAdding(false);
+    }
   };
 
   if (isLoading) {
@@ -119,46 +151,44 @@ export default function RecipeDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
           <div className="card overflow-hidden">
-            <div className="relative h-80 bg-gradient-to-br from-primary-400 to-primary-600">
-              <div className="absolute inset-0 flex items-center justify-center text-white text-8xl opacity-50">
-                🍳
-              </div>
-              
-              <div className="absolute top-4 right-4 flex space-x-2">
-                <button
-                  onClick={toggleFavorite}
-                  className="p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-md hover:scale-110 transition-transform"
-                >
-                  <Heart
-                    size={20}
-                    className={isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-600'}
-                  />
-                </button>
-                <button
-                  onClick={() => navigator.share?.({ title: recipe.title, text: recipe.description })}
-                  className="p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-md hover:scale-110 transition-transform"
-                >
-                  <Share2 size={20} className="text-gray-600" />
-                </button>
+            <div className="relative bg-gradient-to-br from-primary-400 to-primary-600 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex space-x-2">
+                  <button
+                    onClick={toggleFavorite}
+                    className="p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-md hover:scale-110 transition-transform"
+                  >
+                    <Heart
+                      size={20}
+                      className={isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-600'}
+                    />
+                  </button>
+                  <button
+                    onClick={() => navigator.share?.({ title: recipe.title, text: recipe.description })}
+                    className="p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-md hover:scale-110 transition-transform"
+                  >
+                    <Share2 size={20} className="text-gray-600" />
+                  </button>
+                </div>
+
+                {recipe.match_percentage && recipe.match_percentage > 0 && (
+                  <div className="bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 flex items-center space-x-2">
+                    <ChefHat size={20} className="text-primary-600" />
+                    <span className="font-medium text-primary-600">
+                      {recipe.match_percentage}% 食材匹配
+                    </span>
+                  </div>
+                )}
               </div>
 
-              {recipe.match_percentage && recipe.match_percentage > 0 && (
-                <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 flex items-center space-x-2">
-                  <ChefHat size={20} className="text-primary-600" />
-                  <span className="font-medium text-primary-600">
-                    {recipe.match_percentage}% 食材匹配
-                  </span>
-                </div>
+              <h1 className="text-3xl font-bold text-white mb-2">{recipe.title}</h1>
+              
+              {recipe.description && (
+                <p className="text-white/80 mb-4">{recipe.description}</p>
               )}
             </div>
             
             <div className="p-6">
-              <h1 className="text-3xl font-bold text-gray-800 mb-3">{recipe.title}</h1>
-              
-              {recipe.description && (
-                <p className="text-gray-600 mb-4">{recipe.description}</p>
-              )}
-              
               <div className="flex flex-wrap gap-4 mb-6">
                 <div className="flex items-center space-x-2 bg-gray-100 px-3 py-1.5 rounded-lg">
                   <Clock size={18} className="text-primary-600" />
@@ -202,15 +232,20 @@ export default function RecipeDetailPage() {
               
               {recipe.missing_ingredients && recipe.missing_ingredients.length > 0 && (
                 <button
-                  onClick={toggleShoppingList}
+                  onClick={handleAddToShoppingList}
+                  disabled={isAdding || !recipe.missing_ingredients || recipe.missing_ingredients.length === 0 || isInShoppingList}
                   className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
                     isInShoppingList
                       ? 'bg-accent-500 text-white'
                       : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-                  }`}
+                  } ${(isAdding || !recipe.missing_ingredients || recipe.missing_ingredients.length === 0) ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
-                  <ShoppingCart size={18} />
-                  <span>{isInShoppingList ? '已添加' : '缺少食材'}</span>
+                  {isAdding ? (
+                    <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <ShoppingCart size={18} />
+                  )}
+                  <span>{isInShoppingList ? '已添加' : '添加至采购清单'}</span>
                 </button>
               )}
             </div>
@@ -250,6 +285,16 @@ export default function RecipeDetailPage() {
                     </span>
                   ))}
                 </div>
+                
+                {recipe.missing_ingredients.some(ing => 
+                  ['肉', '鸡', '猪', '牛', '羊', '鱼', '虾', '蟹', '肉'].some(keyword => ing.includes(keyword))
+                ) && (
+                  <div className="mt-3 p-3 bg-red-100 rounded-lg">
+                    <p className="text-red-700 text-sm font-medium">
+                      ⚠️ 此菜谱需要关键食材，请准备或购买
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
@@ -305,11 +350,11 @@ export default function RecipeDetailPage() {
 
               {recipe.missing_ingredients && recipe.missing_ingredients.length > 0 && (
                 <button
-                  onClick={() => navigate(`/cooking/${recipe?.id}`)}
+                  onClick={() => navigate('/shopping')}
                   className="w-full btn-secondary py-3 flex items-center justify-center space-x-2"
                 >
                   <ShoppingCart size={20} />
-                  <span>生成购物清单</span>
+                  <span>查看采购清单</span>
                 </button>
               )}
 

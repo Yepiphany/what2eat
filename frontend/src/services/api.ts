@@ -104,10 +104,35 @@ export const recipeApi = {
     return response.data;
   },
 
-  getShoppingList: async (recipeId: string, userIngredients: string[]): Promise<ShoppingList> => {
-    const response = await api.post(`/recipes/${recipeId}/shopping-list`, {
-      user_ingredients: userIngredients,
+  addToShoppingList: async (recipeId: string, items: string[], recipeTitle?: string): Promise<{ message: string; id: string }> => {
+    const response = await api.post('/shopping-list', {
+      recipe_id: recipeId,
+      items: items,
+      recipe_title: recipeTitle,
     });
+    return response.data;
+  },
+
+  getShoppingLists: async (status?: string): Promise<ShoppingList[]> => {
+    const params = status ? { status } : {};
+    const response = await api.get('/shopping-list', { params });
+    return response.data;
+  },
+
+  deleteShoppingListItem: async (itemId: string): Promise<{ message: string }> => {
+    const response = await api.delete(`/shopping-list/${itemId}`);
+    return response.data;
+  },
+
+  toggleShoppingListItem: async (itemId: string, itemIndex: number): Promise<{ message: string; items: any[] }> => {
+    const response = await api.post(`/shopping-list/${itemId}/toggle-item`, null, {
+      params: { item_index: itemIndex },
+    });
+    return response.data;
+  },
+
+  completeShoppingList: async (itemId: string): Promise<{ message: string }> => {
+    const response = await api.put(`/shopping-list/${itemId}/complete`);
     return response.data;
   },
 };
