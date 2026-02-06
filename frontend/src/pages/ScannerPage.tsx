@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
-import { Camera, Upload, X, RefreshCw, Check, AlertTriangle, Plus } from 'lucide-react';
+import { Camera, Upload, X, RefreshCw, Check, AlertTriangle, Plus, List, Trash2 } from 'lucide-react';
 import { useIngredientsStore } from '../stores';
 import { ingredientApi } from '../services/api';
 import type { Ingredient } from '../types';
 
 export default function ScannerPage() {
   const [mode, setMode] = useState<'camera' | 'upload'>('camera');
+  const [viewMode, setViewMode] = useState<'scan' | 'inventory'>('scan');
   const [isScanning, setIsScanning] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -15,7 +16,7 @@ export default function ScannerPage() {
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { addIngredient, setIngredients } = useIngredientsStore();
+  const { ingredients, addIngredient, setIngredients, removeIngredient } = useIngredientsStore();
 
   useEffect(() => {
     if (mode === 'camera') {
@@ -28,6 +29,32 @@ export default function ScannerPage() {
       stopCamera();
     };
   }, [mode]);
+
+  useEffect(() => {
+    if (viewMode === 'inventory') {
+      loadAllIngredients();
+    }
+  }, [viewMode]);
+
+  const loadAllIngredients = async () => {
+    const userId = localStorage.getItem('user_id') || '00000000-0000-0000-0000-000000000000';
+    try {
+      const data = await ingredientApi.getIngredients(userId);
+      setIngredients(data);
+    } catch (err) {
+      console.error('Failed to load ingredients:', err);
+    }
+  };
+
+  const handleDeleteIngredient = async (ingredientId: string) => {
+    const userId = localStorage.getItem('user_id') || '00000000-0000-0000-0000-000000000000';
+    try {
+      await ingredientApi.deleteIngredient(ingredientId, userId);
+      removeIngredient(ingredientId);
+    } catch (err) {
+      console.error('Failed to delete ingredient:', err);
+    }
+  };
 
   const startCamera = async () => {
     try {
@@ -135,20 +162,46 @@ export default function ScannerPage() {
   };
 
   const saveIngredients = async () => {
-    const userId = localStorage.getItem('user_id') || 'default_user';
+    const userId = localStorage.getItem('user_id') || '00000000-0000-0000-0000-000000000000';
+    const validIngredients = detectedIngredients.filter(ing => ing.name && ing.name.trim() !== '');
     
-    for (const ingredient of detectedIngredients) {
-      if (ingredient.name) {
-        await ingredientApi.addIngredient(ingredient as Partial<Ingredient>, userId);
-      }
+    if (validIngredients.length === 0) {
+      setError('请至少添加一种食材名称');
+      return;
     }
     
-    const allIngredients = await ingredientApi.getIngredients(userId);
-    setIngredients(allIngredients);
-    resetScanner();
+    setIsAnalyzing(true);
+    setError(null);
+    
+    try {
+      const savedIngredients = [];
+      
+      for (const ingredient of validIngredients) {
+        try {
+          const saved = await ingredientApi.addIngredient(ingredient as Partial<Ingredient>, userId);
+          savedIngredients.push(saved);
+        } catch (err) {
+          console.error('Failed to save ingredient:', ingredient.name, err);
+        }
+      }
+      
+      if (savedIngredients.length > 0) {
+        const allIngredients = await ingredientApi.getIngredients(userId);
+        setIngredients(allIngredients);
+        alert(`成功保存 ${savedIngredients.length} 种食材到库存！`);
+        resetScanner();
+      } else {
+        setError('保存失败，请重试');
+      }
+    } catch (err) {
+      console.error('Save error:', err);
+      setError('保存失败，请检查网络连接');
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
-  const removeIngredient = (index: number) => {
+  const removeDetectedIngredient = (index: number) => {
     setDetectedIngredients(prev => prev.filter((_, i) => i !== index));
   };
 
@@ -189,33 +242,56 @@ export default function ScannerPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       <header className="text-center">
-        <h1 className="text-3xl font-bold text-gray-800">📸 扫一扫冰箱</h1>
-        <p className="text-gray-500 mt-2">AI智能识别食材，管理你的饮食库存</p>
+        <h1 className="text-3xl font-bold text-gray-800">
+          {viewMode === 'inventory' ? '📦 我的食材库存' : '📸 扫一扫冰箱'}
+        </h1>
+        <p className="text-gray-500 mt-2">
+          {viewMode === 'inventory' ? '管理您的食材库存' : 'AI智能识别食材，管理你的饮食库存'}
+        </p>
       </header>
 
       <div className="flex justify-center space-x-4">
-        <button
-          onClick={() => setMode('camera')}
-          className={`flex items-center space-x-2 px-6 py-3 rounded-full font-medium transition-all ${
-            mode === 'camera'
-              ? 'bg-primary-500 text-white shadow-lg'
-              : 'bg-white text-gray-600 hover:bg-gray-50'
-          }`}
-        >
-          <Camera size={20} />
-          <span>拍照识别</span>
-        </button>
-        <button
-          onClick={() => setMode('upload')}
-          className={`flex items-center space-x-2 px-6 py-3 rounded-full font-medium transition-all ${
-            mode === 'upload'
-              ? 'bg-primary-500 text-white shadow-lg'
-              : 'bg-white text-gray-600 hover:bg-gray-50'
-          }`}
-        >
-          <Upload size={20} />
-          <span>上传照片</span>
-        </button>
+        {viewMode === 'inventory' ? (
+          <button
+            onClick={() => { setViewMode('scan'); resetScanner(); }}
+            className="flex items-center space-x-2 px-6 py-3 rounded-full font-medium bg-primary-500 text-white shadow-lg"
+          >
+            <Camera size={20} />
+            <span>返回扫描</span>
+          </button>
+        ) : (
+          <>
+            <button
+              onClick={() => setMode('camera')}
+              className={`flex items-center space-x-2 px-6 py-3 rounded-full font-medium transition-all ${
+                mode === 'camera'
+                  ? 'bg-primary-500 text-white shadow-lg'
+                  : 'bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <Camera size={20} />
+              <span>拍照识别</span>
+            </button>
+            <button
+              onClick={() => setMode('upload')}
+              className={`flex items-center space-x-2 px-6 py-3 rounded-full font-medium transition-all ${
+                mode === 'upload'
+                  ? 'bg-primary-500 text-white shadow-lg'
+                  : 'bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <Upload size={20} />
+              <span>上传照片</span>
+            </button>
+            <button
+              onClick={() => setViewMode('inventory')}
+              className="flex items-center space-x-2 px-6 py-3 rounded-full font-medium bg-accent-500 text-white shadow-lg"
+            >
+              <List size={20} />
+              <span>查看库存</span>
+            </button>
+          </>
+        )}
       </div>
 
       {error && (
@@ -225,7 +301,50 @@ export default function ScannerPage() {
         </div>
       )}
 
-      {previewUrl ? (
+      {viewMode === 'inventory' ? (
+        <div className="card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-800">
+              全部食材 ({ingredients.length} 种)
+            </h3>
+          </div>
+          
+          {ingredients.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              <List size={48} className="mx-auto mb-4 opacity-50" />
+              <p>暂无食材</p>
+              <p className="text-sm mt-2">请扫描添加食材到库存</p>
+            </div>
+          ) : (
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+              {ingredients.map((ing) => (
+                <div
+                  key={ing.id}
+                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${categoryColors[ing.category || 'other']}`}>
+                      {ing.category || '未知'}
+                    </div>
+                    <div>
+                      <div className="font-medium text-gray-800">{ing.name}</div>
+                      <div className="text-sm text-gray-500">
+                        {ing.quantity}{ing.unit} · {ing.expiry_date ? `保质期至 ${new Date(ing.expiry_date).toLocaleDateString()}` : '无保质期'}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteIngredient(ing.id!)}
+                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : previewUrl ? (
         <div className="card overflow-hidden">
           <div className="relative">
             <img
@@ -298,7 +417,7 @@ export default function ScannerPage() {
                   </select>
                   
                   <button
-                    onClick={() => removeIngredient(index)}
+                    onClick={() => removeDetectedIngredient(index)}
                     className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                   >
                     <X size={18} />

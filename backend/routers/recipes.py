@@ -1,80 +1,82 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from typing import List, Optional
-from models.database import get_supabase_client
-from models.recipe_schemas import (
-    RecipeCreate, RecipeResponse, RecipeRecommendationRequest,
-    TastePreference, DietType, RecipeDifficulty
-)
-from services.recipe_service import recommend_recipes
+from pydantic import BaseModel
+from services.recipe_service import enhance_recipe_with_matching, generate_recipe_id
 
 router = APIRouter()
-supabase = get_supabase_client()
 
-@router.post("/recommend", response_model=List[RecipeResponse])
-async def get_recipe_recommendations(request: RecipeRecommendationRequest):
-    try:
-        recommendations = await recommend_recipes(
-            available_ingredients=request.available_ingredients,
-            taste_preferences=request.taste_preferences,
-            diet_type=request.diet_type,
-            max_cooking_time=request.max_cooking_time,
-            max_difficulty=request.max_difficulty
-        )
-        return recommendations
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/{recipe_id}", response_model=RecipeResponse)
-async def get_recipe(recipe_id: str):
-    try:
-        result = supabase.table("recipes").select("*").eq("id", recipe_id).execute()
-        
-        if result.data:
-            return RecipeResponse(**result.data[0])
-        else:
-            raise HTTPException(status_code=404, detail="Recipe not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/", response_model=List[RecipeResponse])
-async def get_recipes(
-    category: Optional[str] = None,
-    diet_type: Optional[DietType] = None,
-    difficulty: Optional[RecipeDifficulty] = None,
-    limit: int = 20,
-    offset: int = 0
-):
-    try:
-        query = supabase.table("recipes").select("*")
-        
-        if category:
-            query = query.like("title", f"%{category}%")
-        if diet_type:
-            query = query.contains("diet_types", [diet_type.value])
-        if difficulty:
-            query = query.eq("difficulty", difficulty.value)
-        
-        result = query.range(offset, offset + limit - 1).execute()
-        
-        if result.data:
-            return [RecipeResponse(**item) for item in result.data]
-        
+@router.post("/recommend")
+async def get_recipe_recommendations(request: Request):
+    from models.recipe_schemas import TastePreference, DietType
+    
+    data = await request.json()
+    available_ingredients = data.get('available_ingredients', [])
+    taste_preferences = data.get('taste_preferences', [])
+    diet_type = data.get('diet_type', None)
+    
+    if not available_ingredients:
         return []
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    
+    from services.recipe_service import get_ai_batch_recipes
+    
+    recipes = await get_ai_batch_recipes(
+        available_ingredients=available_ingredients,
+        taste_preferences=taste_preferences,
+        diet_type=diet_type,
+        count=10
+    )
+    return recipes
 
-@router.post("/", response_model=RecipeResponse)
-async def create_recipe(recipe: RecipeCreate, user_id: Optional[str] = None):
-    try:
-        data = recipe.model_dump()
-        if user_id:
-            data["user_id"] = user_id
-        
-        result = supabase.table("recipes").insert(data).execute()
-        
-        if result.data:
-            return RecipeResponse(**result.data[0])
-        else:
-            raise HTTPException(status_code=400, detail="Failed to create recipe")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+@router.post("/batch")
+async def get_batch_recipes(request: Request):
+    from models.recipe_schemas import TastePreference, DietType
+    
+    data = await request.json()
+    available_ingredients = data.get('available_ingredients', [])
+    taste_preferences = data.get('taste_preferences', [])
+    diet_type = data.get('diet_type', None)
+    
+    from services.recipe_service import get_ai_batch_recipes
+    
+    recipes = await get_ai_batch_recipes(
+        available_ingredients=available_ingredients,
+        taste_preferences=taste_preferences,
+        diet_type=diet_type,
+        count=10
+    )
+    return {"recipes": recipes, "total": len(recipes)}
+
+@router.get("/{recipe_id}")
+async def get_recipe(recipe_id: str):
+    return {
+        "id": recipe_id,
+        "title": "示例菜谱",
+        "description": "菜谱详情",
+        "ingredients": ["食材1", "食材2"],
+        "steps": ["步骤1", "步骤2"],
+        "cooking_time": 30,
+        "difficulty": "easy",
+        "taste_tags": ["mild"],
+        "diet_types": ["normal"],
+        "calories": 300,
+        "servings": 2,
+        "matched_ingredients": [],
+        "missing_ingredients": [],
+        "match_percentage": 0,
+        "image_url": None
+    }
+
+@router.get("/")
+async def get_recipes():
+    return []
+
+@router.post("/")
+async def create_recipe(request):
+    return {
+        "id": "new_recipe_1",
+        **(request.model_dump() if hasattr(request, 'model_dump') else dict(request)),
+        "matched_ingredients": [],
+        "missing_ingredients": [],
+        "match_percentage": 0,
+        "image_url": None
+    }

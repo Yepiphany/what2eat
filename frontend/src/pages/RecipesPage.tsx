@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Filter, Clock, Flame, ChevronDown, Sparkles } from 'lucide-react';
+import { Search, Filter, Clock, Flame, ChevronDown, Sparkles, RefreshCw } from 'lucide-react';
 import { useIngredientsStore, useRecipesStore } from '../stores';
 import { recipeApi } from '../services/api';
 import type { Recipe, DietType, TastePreference } from '../types';
@@ -31,6 +31,8 @@ const difficultyOptions = [
   { value: 'hard', label: '困难', color: 'bg-red-100 text-red-700' },
 ];
 
+const ITEMS_PER_PAGE = 3;
+
 export default function RecipesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -39,19 +41,16 @@ export default function RecipesPage() {
   const [maxTime, setMaxTime] = useState<number | null>(null);
   const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
   
   const { ingredients } = useIngredientsStore();
-  const { recommendations, setRecommendations, setLoading } = useRecipesStore();
+  const { recommendations, setRecommendations } = useRecipesStore();
 
   const availableIngredientNames = ingredients.map(ing => ing.name);
 
-  useEffect(() => {
-    fetchRecommendations();
-  }, [selectedTastes, selectedDiet, maxTime, selectedDifficulty]);
-
-  const fetchRecommendations = async () => {
+  const fetchRecipes = async () => {
     setIsLoading(true);
-    setLoading(true);
+    setCurrentPage(0);
     
     try {
       const request = {
@@ -69,9 +68,12 @@ export default function RecipesPage() {
       setRecommendations([]);
     } finally {
       setIsLoading(false);
-      setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchRecipes();
+  }, [selectedTastes, selectedDiet, maxTime, selectedDifficulty]);
 
   const toggleTaste = (taste: TastePreference) => {
     setSelectedTastes(prev =>
@@ -90,12 +92,22 @@ export default function RecipesPage() {
 
   const hasActiveFilters = selectedTastes.length > 0 || selectedDiet || maxTime || selectedDifficulty;
 
+  const handleRefresh = () => {
+    fetchRecipes();
+  };
+
   const filteredRecipes = searchQuery
     ? recommendations.filter(recipe =>
         recipe.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         recipe.ingredients.some(ing => ing.toLowerCase().includes(searchQuery.toLowerCase()))
       )
     : recommendations;
+
+  const totalPages = Math.ceil(filteredRecipes.length / ITEMS_PER_PAGE);
+  const currentRecipes = filteredRecipes.slice(
+    currentPage * ITEMS_PER_PAGE,
+    (currentPage + 1) * ITEMS_PER_PAGE
+  );
 
   const getDifficultyColor = (difficulty: string) => {
     const option = difficultyOptions.find(opt => opt.value === difficulty);
@@ -107,11 +119,10 @@ export default function RecipesPage() {
       <header className="text-center">
         <h1 className="text-3xl font-bold text-gray-800">🍳 智能菜谱推荐</h1>
         <p className="text-gray-500 mt-2">
-          {recommendations.length} 道菜谱推荐
-          {availableIngredientNames.length > 0 && (
-            <span className="text-primary-600">
-              {' '}基于 {availableIngredientNames.length} 种食材
-            </span>
+          {availableIngredientNames.length > 0 ? (
+            <>基于 {availableIngredientNames.length} 种食材，AI 为您定制推荐</>
+          ) : (
+            <>添加食材后获取个性化推荐</>
           )}
         </p>
       </header>
@@ -251,123 +262,175 @@ export default function RecipesPage() {
 
       {isLoading ? (
         <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500" />
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4" />
+            <p className="text-gray-600">AI 正在为您设计专属菜谱...</p>
+            <p className="text-gray-400 text-sm mt-1">这可能需要几秒钟</p>
+          </div>
         </div>
-      ) : filteredRecipes.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredRecipes.map(recipe => (
-            <Link
-              key={recipe.id}
-              to={`/recipes/${recipe.id}`}
-              className="card hover:shadow-xl transition-all duration-300 group"
-            >
-              <div className="relative h-48 bg-gradient-to-br from-primary-400 to-primary-600">
-                <div className="absolute inset-0 flex items-center justify-center text-white text-6xl opacity-50">
-                  🍳
-                </div>
-                
-                {recipe.match_percentage && recipe.match_percentage > 0 && (
-                  <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1 flex items-center space-x-1">
-                    <Sparkles size={14} className="text-primary-600" />
-                    <span className="text-sm font-medium text-primary-600">
-                      {recipe.match_percentage}% 匹配
+      ) : availableIngredientNames.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-4xl">🥗</span>
+          </div>
+          <h3 className="text-xl font-semibold text-gray-800 mb-2">
+            还没有食材
+          </h3>
+          <p className="text-gray-500 mb-6 max-w-md mx-auto">
+            添加食材到库存后，AI 将根据您的食材推荐美味菜谱
+          </p>
+          <Link to="/scanner" className="btn-primary">
+            扫描添加食材
+          </Link>
+        </div>
+      ) : currentRecipes.length > 0 ? (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {currentRecipes.map(recipe => (
+              <Link
+                key={recipe.id}
+                to={`/recipes/${recipe.id}`}
+                className="card hover:shadow-xl transition-all duration-300 group"
+              >
+                <div className="h-16 bg-gradient-to-br from-primary-400 to-primary-600 p-4 flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getDifficultyColor(recipe.difficulty)}`}>
+                      {difficultyOptions.find(o => o.value === recipe.difficulty)?.label}
                     </span>
-                  </div>
-                )}
-                
-                <div className="absolute bottom-3 left-3 flex space-x-2">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getDifficultyColor(recipe.difficulty)}`}>
-                    {difficultyOptions.find(o => o.value === recipe.difficulty)?.label}
-                  </span>
-                  <span className="px-2 py-1 bg-white/90 backdrop-blur-sm rounded-full text-xs font-medium text-gray-700 flex items-center">
-                    <Clock size={12} className="mr-1" />
-                    {recipe.cooking_time}分钟
-                  </span>
-                </div>
-              </div>
-              
-              <div className="p-5">
-                <h3 className="text-lg font-semibold text-gray-800 mb-2 group-hover:text-primary-600 transition-colors">
-                  {recipe.title}
-                </h3>
-                
-                {recipe.description && (
-                  <p className="text-gray-500 text-sm mb-3 line-clamp-2">
-                    {recipe.description}
-                  </p>
-                )}
-                
-                <div className="flex flex-wrap gap-1 mb-3">
-                  {recipe.taste_tags.slice(0, 3).map(tag => {
-                    const tasteOption = tasteOptions.find(t => t.value === tag);
-                    return (
-                      <span
-                        key={tag}
-                        className="text-xs px-2 py-0.5 bg-gray-100 rounded-full text-gray-600"
-                      >
-                        {tasteOption?.emoji} {tasteOption?.label}
-                      </span>
-                    );
-                  })}
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    {recipe.calories && (
-                      <span className="text-sm text-gray-500">
-                        🔥 {recipe.calories} 卡路里
-                      </span>
-                    )}
-                    <span className="text-sm text-gray-500">
-                      👥 {recipe.servings}人份
+                    <span className="px-3 py-1 bg-white/90 backdrop-blur-sm rounded-full text-xs font-medium text-gray-700 flex items-center">
+                      <Clock size={12} className="mr-1" />
+                      {recipe.cooking_time}分钟
                     </span>
                   </div>
                   
-                  <span className="text-primary-600 font-medium text-sm group-hover:translate-x-1 transition-transform">
-                    查看详情 →
-                  </span>
+                  {recipe.match_percentage && recipe.match_percentage > 0 && (
+                    <div className="bg-white/90 backdrop-blur-sm rounded-full px-3 py-1 flex items-center space-x-1">
+                      <Sparkles size={14} className="text-primary-600" />
+                      <span className="text-sm font-medium text-primary-600">
+                        {recipe.match_percentage}%
+                      </span>
+                    </div>
+                  )}
                 </div>
                 
-                {recipe.matched_ingredients && recipe.matched_ingredients.length > 0 && (
-                  <div className="mt-3 pt-3 border-t">
-                    <p className="text-xs text-gray-500 mb-1">已有食材：</p>
-                    <div className="flex flex-wrap gap-1">
-                      {recipe.matched_ingredients.slice(0, 5).map(ing => (
+                <div className="p-5">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2 group-hover:text-primary-600 transition-colors">
+                    {recipe.title}
+                  </h3>
+                  
+                  {recipe.description && (
+                    <p className="text-gray-500 text-sm mb-3 line-clamp-2">
+                      {recipe.description}
+                    </p>
+                  )}
+                  
+                  <div className="flex flex-wrap gap-1 mb-3">
+                    {recipe.taste_tags.slice(0, 3).map(tag => {
+                      const tasteOption = tasteOptions.find(t => t.value === tag);
+                      return (
                         <span
-                          key={ing}
-                          className="text-xs px-2 py-0.5 bg-accent-100 text-accent-700 rounded-full"
+                          key={tag}
+                          className="text-xs px-2 py-0.5 bg-gray-100 rounded-full text-gray-600"
                         >
-                          ✓ {ing}
+                          {tasteOption?.emoji} {tasteOption?.label}
                         </span>
-                      ))}
-                    </div>
+                      );
+                    })}
                   </div>
-                )}
-                
-                {recipe.missing_ingredients && recipe.missing_ingredients.length > 0 && (
-                  <div className="mt-2">
-                    <p className="text-xs text-gray-500 mb-1">缺少食材：</p>
-                    <div className="flex flex-wrap gap-1">
-                      {recipe.missing_ingredients.slice(0, 3).map(ing => (
-                        <span
-                          key={ing}
-                          className="text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full"
-                        >
-                          {ing}
-                        </span>
-                      ))}
-                      {recipe.missing_ingredients.length > 3 && (
-                        <span className="text-xs text-gray-500">
-                          +{recipe.missing_ingredients.length - 3}更多
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      {recipe.calories && (
+                        <span className="text-sm text-gray-500">
+                          🔥 {recipe.calories} 卡路里
                         </span>
                       )}
+                      <span className="text-sm text-gray-500">
+                        👥 {recipe.servings}人份
+                      </span>
                     </div>
+                    
+                    <span className="text-primary-600 font-medium text-sm group-hover:translate-x-1 transition-transform">
+                      查看详情 →
+                    </span>
                   </div>
-                )}
-              </div>
-            </Link>
-          ))}
-        </div>
+                  
+                  {recipe.matched_ingredients && recipe.matched_ingredients.length > 0 && (
+                    <div className="mt-3 pt-3 border-t">
+                      <p className="text-xs text-gray-500 mb-1">已有食材：</p>
+                      <div className="flex flex-wrap gap-1">
+                        {recipe.matched_ingredients.slice(0, 5).map(ing => (
+                          <span
+                            key={ing}
+                            className="text-xs px-2 py-0.5 bg-accent-100 text-accent-700 rounded-full"
+                          >
+                            ✓ {ing}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {recipe.missing_ingredients && recipe.missing_ingredients.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-xs text-gray-500 mb-1">缺少食材：</p>
+                      <div className="flex flex-wrap gap-1">
+                        {recipe.missing_ingredients.slice(0, 3).map(ing => (
+                          <span
+                            key={ing}
+                            className="text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full"
+                          >
+                            {ing}
+                          </span>
+                        ))}
+                        {recipe.missing_ingredients.length > 3 && (
+                          <span className="text-xs text-gray-500">
+                            +{recipe.missing_ingredients.length - 3}更多
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center space-x-4 pt-4">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
+                disabled={currentPage === 0}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                上一页
+              </button>
+              
+              <span className="text-gray-600">
+                {currentPage + 1} / {totalPages}
+              </span>
+              
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages - 1, prev + 1))}
+                disabled={currentPage >= totalPages - 1}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                下一页
+              </button>
+            </div>
+          )}
+
+          <div className="flex justify-center pt-4">
+            <button
+              onClick={handleRefresh}
+              disabled={isLoading}
+              className="flex items-center space-x-2 px-6 py-3 bg-primary-500 text-white rounded-full hover:bg-primary-600 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <RefreshCw size={20} className={isLoading ? 'animate-spin' : ''} />
+              <span>换一批</span>
+            </button>
+          </div>
+        </>
       ) : (
         <div className="text-center py-12">
           <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
