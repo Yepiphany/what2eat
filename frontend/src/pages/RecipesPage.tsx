@@ -16,7 +16,7 @@ export default function RecipesPage() {
   const [showExcludeModal, setShowExcludeModal] = useState(false);
   
   const { ingredients } = useIngredientsStore();
-  const { recommendations, setRecommendations } = useRecipesStore();
+  const { recipePages, currentPage, setRecipePages, addRecipePage, setCurrentPage, recommendations, setRecommendations, loadFromDatabase } = useRecipesStore();
 
   const availableIngredientNames = useMemo(() => 
     ingredients.map(ing => ing.name)
@@ -37,30 +37,40 @@ export default function RecipesPage() {
       };
       
       const recipes = await recipeApi.getRecommendations(request);
-      setRecommendations(recipes);
+      
+      if (forceRefresh) {
+        addRecipePage(recipes);
+      } else {
+        setRecommendations(recipes);
+        setRecipePages([recipes]);
+        setCurrentPage(0);
+      }
     } catch (error) {
       console.error('Failed to fetch recipes:', error);
-      setRecommendations([]);
+      if (recipePages.length === 0) {
+        setRecommendations([]);
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [availableIngredientNames, setRecommendations]);
+  }, [availableIngredientNames, setRecommendations, addRecipePage, setCurrentPage, setRecipePages]);
 
   useEffect(() => {
-    if (availableIngredientNames.length > 0 && recommendations.length === 0) {
-      fetchRecipes([]);
+    if (availableIngredientNames.length > 0) {
+      loadFromDatabase().then(() => {
+        if (recipePages.length === 0) {
+          fetchRecipes([], false);
+        }
+      });
     }
-  }, [availableIngredientNames, recommendations.length, fetchRecipes]);
+  }, [availableIngredientNames]);
 
-  const handleRefresh = useCallback(() => {
-    setExcludedIngredients([]);
-    setShowExcludeModal(true);
-  }, []);
+  const displayRecipes = recipePages[currentPage] || recommendations.slice(0, 5);
+  const totalPages = recipePages.length;
 
-  const confirmExclude = useCallback(() => {
-    setShowExcludeModal(false);
-    fetchRecipes(excludedIngredients, true);
-  }, [fetchRecipes, excludedIngredients]);
+  const handlePageChange = useCallback((pageIndex: number) => {
+    setCurrentPage(pageIndex);
+  }, [setCurrentPage]);
 
   const toggleExcludeIngredient = useCallback((ingredient: string) => {
     setExcludedIngredients(prev =>
@@ -75,7 +85,15 @@ export default function RecipesPage() {
     return option?.color || 'bg-gray-100 text-gray-700 border-gray-200';
   };
 
-  const displayRecipes = recommendations.slice(0, 5);
+  const handleRefresh = useCallback(() => {
+    setExcludedIngredients([]);
+    fetchRecipes([], true);
+  }, [fetchRecipes]);
+
+  const confirmExclude = useCallback(() => {
+    setShowExcludeModal(false);
+    fetchRecipes(excludedIngredients, true);
+  }, [fetchRecipes, excludedIngredients]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -133,7 +151,22 @@ export default function RecipesPage() {
             </div>
           </div>
 
-          <div className="flex justify-center pt-6">
+          <div className="flex justify-center pt-6 space-x-4">
+            {totalPages > 1 && (
+              <div className="flex items-center space-x-2">
+                {Array.from({ length: totalPages }).map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handlePageChange(index)}
+                    className={`w-3 h-3 rounded-full transition-all ${
+                      currentPage === index
+                        ? 'bg-primary-500 w-6'
+                        : 'bg-gray-300 hover:bg-gray-400'
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
             <button
               onClick={handleRefresh}
               disabled={isLoading}

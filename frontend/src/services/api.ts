@@ -135,6 +135,25 @@ export const recipeApi = {
     const response = await api.put(`/shopping-list/${itemId}/complete`);
     return response.data;
   },
+
+  getRecipePages: async (): Promise<{ pages: Recipe[][]; current_page: number }> => {
+    const response = await api.get('/recipe-pages/');
+    return response.data;
+  },
+
+  saveRecipePage: async (pageData: {
+    page_index: number;
+    recipes: Recipe[];
+    ingredients: string[];
+  }): Promise<{ message: string; page_index: number }> => {
+    const response = await api.post('/recipe-pages/', pageData);
+    return response.data;
+  },
+
+  clearRecipePages: async (): Promise<{ message: string }> => {
+    const response = await api.delete('/recipe-pages/');
+    return response.data;
+  },
 };
 
 export const cookingApi = {

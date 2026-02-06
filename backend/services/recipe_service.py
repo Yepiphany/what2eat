@@ -189,11 +189,14 @@ async def get_ai_batch_recipes(
 饮食限制: {diet_str}
 
 请直接返回5道菜（四菜一汤），包含：
-- 2道荤菜（需要肉类/海鲜/蛋）
-- 2道素菜（纯蔬菜/豆制品）
+- 2道荤菜（必须包含肉类/海鲜，如：猪肉、牛肉、鸡肉、鱼虾等，禁止用蛋类冒充荤菜）
+- 2道素菜（纯蔬菜/豆制品，不能含肉类）
 - 1道汤品
 
-**重要**：无论用户是否有肉类食材，都必须推荐2道荤菜。如果用户没有肉类，请推荐需要常见肉类的菜品（如猪肉、鸡肉、牛肉等），并将需要的肉类作为缺少食材返回。
+**重要规则**：
+1. 荤菜必须包含真实肉类（猪肉、牛肉、鸡肉、鱼、虾等），禁止使用蛋类作为荤菜
+2. 如果用户没有肉类食材，仍然必须推荐2道需要肉类的荤菜，将缺少的肉类放到missing_ingredients中
+3. 素菜禁止包含任何肉类食材
 
 严格按照JSON数组格式返回：
 
@@ -213,7 +216,8 @@ async def get_ai_batch_recipes(
     }}
 ]
 
-注意：确保包含2个meat、2个veg、1个soup。即使用户没有肉类食材，也要推荐荤菜。"""
+注意：严格确保包含2个meat、2个veg、1个soup。meat类别必须包含真实肉类，禁止蛋类。"""
+
                 },
                 {
                     "role": "user",
@@ -250,24 +254,24 @@ async def get_ai_batch_recipes(
                         category = recipe.get("category", "").lower()
                         ingredients_list = [i.lower() for i in recipe.get("ingredients", [])]
                         
+                        meat_keywords = ["肉", "猪", "牛", "羊", "鸭", "鹅", "鱼", "虾", "蟹", "贝", "排骨", "五花", "里脊"]
                         has_egg = any("蛋" in ing for ing in ingredients_list)
+                        has_other_meat = any(
+                            any(keyword in ing for keyword in meat_keywords)
+                            for ing in ingredients_list
+                        )
                         
-                        if category == "meat" and has_egg:
-                            veg_recipes.append(recipe)
-                        elif category == "meat":
-                            meat_recipes.append(recipe)
+                        if category == "meat":
+                            if has_egg and not has_other_meat:
+                                veg_recipes.append(recipe)
+                            else:
+                                meat_recipes.append(recipe)
                         elif category == "veg":
                             veg_recipes.append(recipe)
                         elif category == "soup":
                             soup_recipes.append(recipe)
                         else:
                             meat_recipes.append(recipe)
-                
-                if len(meat_recipes) < 2:
-                    needed = 2 - len(meat_recipes)
-                    extra_meat = veg_recipes[:needed]
-                    veg_recipes = veg_recipes[needed:]
-                    meat_recipes.extend(extra_meat)
                 
                 all_recipes = meat_recipes[:2] + veg_recipes[:2] + soup_recipes[:1]
         except json.JSONDecodeError as e:

@@ -56,25 +56,54 @@ export const useIngredientsStore = create<IngredientsStore>()(
 
 interface RecipesStore {
   recommendations: Recipe[];
+  recipePages: Recipe[][];
+  currentPage: number;
   currentRecipe: Recipe | null;
   isLoading: boolean;
   error: string | null;
   
   setRecommendations: (recipes: Recipe[]) => void;
+  setRecipePages: (pages: Recipe[][]) => void;
+  addRecipePage: (page: Recipe[]) => Promise<void>;
+  setCurrentPage: (page: number) => void;
   setCurrentRecipe: (recipe: Recipe | null) => void;
   addRecommendations: (recipes: Recipe[]) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
-  clearRecommendations: () => void;
+  clearRecommendations: () => Promise<void>;
+  loadFromDatabase: () => Promise<void>;
 }
 
-export const useRecipesStore = create<RecipesStore>()((set) => ({
+export const useRecipesStore = create<RecipesStore>()((set, get) => ({
   recommendations: [],
+  recipePages: [],
+  currentPage: 0,
   currentRecipe: null,
   isLoading: false,
   error: null,
   
   setRecommendations: (recipes) => set({ recommendations: recipes }),
+  
+  setRecipePages: (pages) => set({ recipePages: pages }),
+  
+  addRecipePage: async (page) => {
+    const state = get();
+    const newPages = [...state.recipePages, page];
+    set({ recipePages: newPages, currentPage: newPages.length - 1 });
+    
+    try {
+      const { recipeApi } = await import('../services/api');
+      await recipeApi.saveRecipePage({
+        page_index: newPages.length - 1,
+        recipes: page,
+        ingredients: [],
+      });
+    } catch (e) {
+      console.error('Failed to save recipe page:', e);
+    }
+  },
+  
+  setCurrentPage: (page) => set({ currentPage: page }),
   
   setCurrentRecipe: (recipe) => set({ currentRecipe: recipe }),
   
@@ -87,7 +116,29 @@ export const useRecipesStore = create<RecipesStore>()((set) => ({
   
   setError: (error) => set({ error }),
   
-  clearRecommendations: () => set({ recommendations: [], currentRecipe: null }),
+  clearRecommendations: async () => {
+    set({ recommendations: [], recipePages: [], currentPage: 0, currentRecipe: null });
+    
+    try {
+      const { recipeApi } = await import('../services/api');
+      await recipeApi.clearRecipePages();
+    } catch (e) {
+      console.error('Failed to clear recipe pages:', e);
+    }
+  },
+  
+  loadFromDatabase: async () => {
+    try {
+      const { recipeApi } = await import('../services/api');
+      const data = await recipeApi.getRecipePages();
+      set({
+        recipePages: data.pages || [],
+        currentPage: Math.max(0, data.current_page || 0),
+      });
+    } catch (e) {
+      console.error('Failed to load recipe pages from database:', e);
+    }
+  },
 }));
 
 interface CookingStore {

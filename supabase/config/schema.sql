@@ -86,6 +86,17 @@ CREATE TABLE shopping_lists (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Recipe Pages Table (stores multiple recipe pages for persistence)
+CREATE TABLE recipe_pages (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    page_index INTEGER NOT NULL DEFAULT 0,
+    recipes JSONB NOT NULL DEFAULT '[]',
+    ingredients_hash TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Indexes for better query performance
 CREATE INDEX idx_ingredients_user_id ON ingredients(user_id);
 CREATE INDEX idx_ingredients_category ON ingredients(category);
@@ -104,6 +115,7 @@ ALTER TABLE recipes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cooking_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_favorites ENABLE ROW LEVEL SECURITY;
 ALTER TABLE shopping_lists ENABLE ROW LEVEL SECURITY;
+ALTER TABLE recipe_pages ENABLE ROW LEVEL SECURITY;
 
 -- Users policies
 CREATE POLICY "Users can view their own data" ON users
@@ -174,6 +186,19 @@ CREATE POLICY "Users can update own shopping lists" ON shopping_lists
 CREATE POLICY "Users can delete own shopping lists" ON shopping_lists
     FOR DELETE USING (user_id = auth.uid());
 
+-- Recipe pages policies - allow hardcoded user_id for development
+CREATE POLICY "Users can view own recipe pages" ON recipe_pages
+    FOR SELECT USING (user_id = auth.uid() OR user_id = '00000000-0000-0000-0000-000000000000'::uuid);
+
+CREATE POLICY "Users can insert own recipe pages" ON recipe_pages
+    FOR INSERT WITH CHECK (user_id = auth.uid() OR user_id = '00000000-0000-0000-0000-000000000000'::uuid);
+
+CREATE POLICY "Users can update own recipe pages" ON recipe_pages
+    FOR UPDATE USING (user_id = auth.uid() OR user_id = '00000000-0000-0000-0000-000000000000'::uuid);
+
+CREATE POLICY "Users can delete own recipe pages" ON recipe_pages
+    FOR DELETE USING (user_id = auth.uid() OR user_id = '00000000-0000-0000-0000-000000000000'::uuid);
+
 -- Function to update updated_at timestamp automatically
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -197,6 +222,9 @@ CREATE TRIGGER update_cooking_sessions_updated_at BEFORE UPDATE ON cooking_sessi
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_shopping_lists_updated_at BEFORE UPDATE ON shopping_lists
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_recipe_pages_updated_at BEFORE UPDATE ON recipe_pages
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Insert sample recipes for testing
