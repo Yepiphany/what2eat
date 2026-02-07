@@ -18,6 +18,7 @@ MODELSCOPE_API_KEY = "ms-76b46a1c-253d-45c0-bccd-e91b31bbc460"
 MODELSCOPE_VISION_MODEL = "deepseek-ai/DeepSeek-V3.2"
 
 CACHE_DURATION_HOURS = int(os.getenv("RECIPE_CACHE_HOURS", "24"))
+_RECIPES_MEMORY: dict = {}
 
 def generate_recipe_id() -> str:
     return str(uuid.uuid4())
@@ -73,6 +74,23 @@ def save_recipe_to_database(recipe: Dict):
     try:
         from models.database import get_supabase_client
         client = get_supabase_client()
+        _RECIPES_MEMORY[recipe.get("id")] = {
+            "id": recipe.get("id"),
+            "title": recipe.get("title"),
+            "description": recipe.get("description"),
+            "ingredients": recipe.get("ingredients", []),
+            "steps": recipe.get("steps", []),
+            "cooking_time": recipe.get("cooking_time", 30),
+            "difficulty": recipe.get("difficulty", "medium"),
+            "taste_tags": recipe.get("taste_tags", []),
+            "diet_types": recipe.get("diet_types", []),
+            "calories": recipe.get("calories"),
+            "servings": recipe.get("servings", 2),
+            "matched_ingredients": recipe.get("matched_ingredients", []),
+            "missing_ingredients": recipe.get("missing_ingredients", []),
+            "match_percentage": recipe.get("match_percentage", 0),
+            "image_url": recipe.get("image_url")
+        }
         if client is None:
             return
         
@@ -109,8 +127,10 @@ def get_recipe_from_database(recipe_id: str) -> Optional[Dict]:
     try:
         from models.database import get_supabase_client
         client = get_supabase_client()
+        if recipe_id in _RECIPES_MEMORY:
+            return _RECIPES_MEMORY[recipe_id]
         if client is None:
-            return None
+            return _RECIPES_MEMORY.get(recipe_id)
         
         result = client.table("recipes").select("*").eq("id", recipe_id).execute()
         
@@ -119,7 +139,7 @@ def get_recipe_from_database(recipe_id: str) -> Optional[Dict]:
     except Exception as e:
         print(f"Failed to get recipe from database: {e}")
     
-    return None
+    return _RECIPES_MEMORY.get(recipe_id)
 
 async def get_ai_batch_recipes(
     available_ingredients: List[str],

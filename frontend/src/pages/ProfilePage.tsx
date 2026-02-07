@@ -5,11 +5,7 @@ import {
   Heart,
   Clock,
   ChefHat,
-  Bell,
-  Moon,
   Sun,
-  Globe,
-  Shield,
   HelpCircle,
   LogOut,
   Save,
@@ -53,7 +49,6 @@ export default function ProfilePage() {
   const [selectedDiet, setSelectedDiet] = useState<DietType | null>(null);
   const [maxCookingTime, setMaxCookingTime] = useState<number>(60);
   const [showPreferencesModal, setShowPreferencesModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<'profile' | 'stats' | 'settings'>('profile');
   
   const { currentUser, setUser, isAuthenticated, updatePreferences, logout } = useUserStore();
   const { ingredients } = useIngredientsStore();
@@ -149,26 +144,9 @@ export default function ProfilePage() {
         <h1 className="text-3xl font-bold text-gray-800">我的</h1>
       </header>
 
-      <div className="flex space-x-4 mb-6">
-        {(['profile', 'stats', 'settings'] as const).map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-6 py-3 rounded-full font-medium transition-all ${
-              activeTab === tab
-                ? 'bg-primary-500 text-white shadow-md'
-                : 'bg-white text-gray-600 hover:bg-gray-50'
-            }`}
-          >
-            {tab === 'profile' && '👤 个人'}
-            {tab === 'stats' && '📊 统计'}
-            {tab === 'settings' && '⚙️ 设置'}
-          </button>
-        ))}
-      </div>
+      {/* merged sections: personal, stats, settings */}
 
-      {activeTab === 'profile' && (
-        <div className="space-y-6">
+      <div className="space-y-6">
           <div className="card p-6">
             <div className="flex items-start justify-between mb-6">
               <div className="flex items-center space-x-4">
@@ -228,13 +206,16 @@ export default function ProfilePage() {
                 <div className="text-sm text-gray-500">口味偏好</div>
               </button>
               
-              <div className="p-4 bg-accent-50 rounded-xl text-center">
+              <button
+                onClick={() => setShowPreferencesModal(true)}
+                className="p-4 bg-accent-50 rounded-xl text-center hover:bg-accent-100 transition-colors"
+              >
                 <div className="text-2xl mb-1">🥗</div>
                 <div className="text-lg font-bold text-accent-600">
-                  {selectedDiet ? dietOptions.find(d => d.value === selectedDiet)?.label.slice(0, 2) : '未设置'}
+                  {selectedDiet ? dietOptions.find(d => d.value === selectedDiet)?.label : '未设置'}
                 </div>
                 <div className="text-sm text-gray-500">饮食类型</div>
-              </div>
+              </button>
               
               <div className="p-4 bg-purple-50 rounded-xl text-center">
                 <div className="text-2xl mb-1">⏱️</div>
@@ -258,39 +239,10 @@ export default function ProfilePage() {
             </button>
           </div>
 
-          <div className="card p-6">
-            <h3 className="font-semibold text-gray-800 mb-4">快捷入口</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <button className="p-4 bg-gray-50 rounded-xl text-left hover:bg-gray-100 transition-colors">
-                <Heart size={24} className="text-red-500 mb-2" />
-                <div className="font-medium text-gray-800">我的收藏</div>
-                <div className="text-sm text-gray-500">{stats.favoriteRecipes} 个菜谱</div>
-              </button>
-              
-              <button className="p-4 bg-gray-50 rounded-xl text-left hover:bg-gray-100 transition-colors">
-                <Clock size={24} className="text-blue-500 mb-2" />
-                <div className="font-medium text-gray-800">烹饪历史</div>
-                <div className="text-sm text-gray-500">{stats.cookingSessions} 次烹饪</div>
-              </button>
-              
-              <button className="p-4 bg-gray-50 rounded-xl text-left hover:bg-gray-100 transition-colors">
-                <ChefHat size={24} className="text-purple-500 mb-2" />
-                <div className="font-medium text-gray-800">我的菜谱</div>
-                <div className="text-sm text-gray-500">8 个原创菜谱</div>
-              </button>
-              
-              <button className="p-4 bg-gray-50 rounded-xl text-left hover:bg-gray-100 transition-colors">
-                <Trophy size={24} className="text-yellow-500 mb-2" />
-                <div className="font-medium text-gray-800">成就徽章</div>
-                <div className="text-sm text-gray-500">解锁 5 个成就</div>
-              </button>
-            </div>
-          </div>
+          {/* removed quick entries */}
         </div>
-      )}
 
-      {activeTab === 'stats' && (
-        <div className="space-y-6">
+      <div className="space-y-6">
           <div className="card p-6">
             <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
               <TrendingUp size={20} className="mr-2 text-primary-600" />
@@ -374,45 +326,9 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
-      )}
 
-      {activeTab === 'settings' && (
-        <div className="space-y-6">
+      <div className="space-y-6">
           <div className="card divide-y">
-            <button className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
-              <div className="flex items-center space-x-3">
-                <Bell size={20} className="text-primary-600" />
-                <span className="font-medium text-gray-800">消息通知</span>
-              </div>
-              <span className="text-gray-400">→</span>
-            </button>
-            
-            <button className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
-              <div className="flex items-center space-x-3">
-                <Moon size={20} className="text-primary-600" />
-                <span className="font-medium text-gray-800">深色模式</span>
-              </div>
-              <div className="w-12 h-6 bg-gray-200 rounded-full relative cursor-pointer">
-                <div className="w-5 h-5 bg-white rounded-full absolute top-0.5 left-0.5 shadow transition-transform" />
-              </div>
-            </button>
-            
-            <button className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
-              <div className="flex items-center space-x-3">
-                <Globe size={20} className="text-primary-600" />
-                <span className="font-medium text-gray-800">语言</span>
-              </div>
-              <span className="text-gray-400">简体中文 →</span>
-            </button>
-            
-            <button className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
-              <div className="flex items-center space-x-3">
-                <Shield size={20} className="text-primary-600" />
-                <span className="font-medium text-gray-800">隐私设置</span>
-              </div>
-              <span className="text-gray-400">→</span>
-            </button>
-            
             <button className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
               <div className="flex items-center space-x-3">
                 <HelpCircle size={20} className="text-primary-600" />
@@ -426,7 +342,7 @@ export default function ProfilePage() {
             <h3 className="font-semibold text-gray-800 mb-4">关于</h3>
             <div className="space-y-2 text-sm text-gray-600">
               <p>版本：1.0.0</p>
-              <p>构建时间：2024年1月</p>
+              <p>构建时间：2026年2月</p>
               <p className="text-primary-600">检查更新</p>
             </div>
           </div>
@@ -439,7 +355,6 @@ export default function ProfilePage() {
             <span>退出登录</span>
           </button>
         </div>
-      )}
 
       {showPreferencesModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

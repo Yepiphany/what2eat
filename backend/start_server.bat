@@ -12,7 +12,7 @@ echo [1] 检测 Python 环境...
 echo.
 
 REM 使用 Windows Store 的 Python（已安装依赖）
-set PYTHON_PATH=C:\Users\Jason\AppData\Local\Microsoft\WindowsApps\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\python.exe
+set PYTHON_PATH="C:\Users\shin1\AppData\Local\Programs\Python\Python312\python.exe"
 
 if exist "%PYTHON_PATH%" (
     echo     找到正确的 Python:
@@ -20,8 +20,9 @@ if exist "%PYTHON_PATH%" (
     echo.
 ) else (
     echo     ✗ 未找到正确的 Python
-    echo     尝试使用系统 Python...
-    set PYTHON_PATH=python
+    echo     请确保已安装 Python 并配置到 PATH
+    pause
+    exit /b 1
 )
 
 echo.
