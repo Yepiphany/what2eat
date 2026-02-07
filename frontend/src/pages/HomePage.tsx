@@ -1,18 +1,19 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Scan, Utensils, ChefHat, ArrowRight, Sparkles, Plus, X, ShoppingCart, Check } from 'lucide-react';
+import { Scan, Utensils, ChefHat, ArrowRight, Sparkles, Plus, X, ShoppingCart, Check, RefreshCw } from 'lucide-react';
 import { useIngredientsStore, useRecipesStore } from '../stores';
 import { ingredientApi, recipeApi } from '../services/api';
 import type { Ingredient } from '../types';
 
 export default function HomePage() {
   const { ingredients, addIngredient, setIngredients, removeIngredient } = useIngredientsStore();
-  const { recommendations, setRecommendations } = useRecipesStore();
+  const { recommendations, setRecommendations, recipePages } = useRecipesStore();
   const [showAddForm, setShowAddForm] = useState(false);
   const [newIngredient, setNewIngredient] = useState({ name: '', quantity: 1, unit: '个', category: 'other' });
   const [isAdding, setIsAdding] = useState(false);
   const [shoppingLists, setShoppingLists] = useState<any[]>([]);
   const [isLoadingRecipes, setIsLoadingRecipes] = useState(false);
+  const [showRecipeRefreshDialog, setShowRecipeRefreshDialog] = useState(false);
 
   const expiringSoon = ingredients.filter(ing => ing.is_expiring_soon);
   const hasIngredients = ingredients.length > 0;
@@ -81,6 +82,7 @@ export default function HomePage() {
       addIngredient(saved);
       setNewIngredient({ name: '', quantity: 1, unit: '个' });
       setShowAddForm(false);
+      setShowRecipeRefreshDialog(true);
     } catch (err) {
       console.error('Failed to add ingredient:', err);
     } finally {
@@ -93,6 +95,7 @@ export default function HomePage() {
     try {
       await ingredientApi.deleteIngredient(ingredientId, userId);
       removeIngredient(ingredientId);
+      setShowRecipeRefreshDialog(true);
     } catch (err) {
       console.error('Failed to delete ingredient:', err);
     }
@@ -111,54 +114,58 @@ export default function HomePage() {
         </p>
       </section>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Link
           to="/scanner"
-          className="card p-6 group hover:border-2 hover:border-primary-500"
+          className="card p-8 group hover:border-2 hover:border-primary-500 min-h-[160px] flex items-center"
         >
-          <div className="flex items-center space-x-4">
-            <div className="w-16 h-16 bg-primary-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Scan size={32} className="text-primary-600" />
+          <div className="flex items-center space-x-6 w-full">
+            <div className="w-32 h-32 bg-primary-100 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Scan size={72} className="text-primary-600" />
             </div>
             <div className="flex-1">
-              <h3 className="text-xl font-semibold text-gray-800">扫一扫冰箱</h3>
-              <p className="text-gray-500 text-sm mt-1">AI识别食材，智能管理库存</p>
+              <h3 className="text-2xl font-semibold text-gray-800">扫一扫冰箱</h3>
+              <p className="text-gray-500 text-base mt-2">AI识别食材，智能管理库存</p>
             </div>
-            <ArrowRight size={20} className="text-gray-400 group-hover:text-primary-600 transition-colors" />
+          </div>
+          <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform ml-auto">
+            <ArrowRight size={24} className="text-gray-400 group-hover:text-primary-600 transition-colors" />
           </div>
         </Link>
 
-        <Link
-          to="/recipes"
-          className="card p-6 group hover:border-2 hover:border-accent-500"
-        >
-          <div className="flex items-center space-x-4">
-            <div className="w-16 h-16 bg-accent-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Utensils size={32} className="text-accent-600" />
+        <div className="flex flex-col gap-6">
+          <Link
+            to="/recipes"
+            className="card p-6 group hover:border-2 hover:border-accent-500"
+          >
+            <div className="flex items-center space-x-4">
+              <div className="w-16 h-16 bg-accent-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Utensils size={32} className="text-accent-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-semibold text-gray-800">智能推荐</h3>
+                <p className="text-gray-500 text-sm mt-1">根据食材推荐美味菜谱</p>
+              </div>
+              <ArrowRight size={20} className="text-gray-400 group-hover:text-accent-600 transition-colors" />
             </div>
-            <div className="flex-1">
-              <h3 className="text-xl font-semibold text-gray-800">智能推荐</h3>
-              <p className="text-gray-500 text-sm mt-1">根据食材推荐美味菜谱</p>
-            </div>
-            <ArrowRight size={20} className="text-gray-400 group-hover:text-accent-600 transition-colors" />
-          </div>
-        </Link>
+          </Link>
 
-        <Link
-          to="/profile"
-          className="card p-6 group hover:border-2 hover:border-purple-500"
-        >
-          <div className="flex items-center space-x-4">
-            <div className="w-16 h-16 bg-purple-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Sparkles size={32} className="text-purple-600" />
+          <Link
+            to="/profile"
+            className="card p-6 group hover:border-2 hover:border-purple-500"
+          >
+            <div className="flex items-center space-x-4">
+              <div className="w-16 h-16 bg-purple-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Sparkles size={32} className="text-purple-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-semibold text-gray-800">个性化设置</h3>
+                <p className="text-gray-500 text-sm mt-1">定制你的口味偏好</p>
+              </div>
+              <ArrowRight size={20} className="text-gray-400 group-hover:text-purple-600 transition-colors" />
             </div>
-            <div className="flex-1">
-              <h3 className="text-xl font-semibold text-gray-800">个性化设置</h3>
-              <p className="text-gray-500 text-sm mt-1">定制你的口味偏好</p>
-            </div>
-            <ArrowRight size={20} className="text-gray-400 group-hover:text-purple-600 transition-colors" />
-          </div>
-        </Link>
+          </Link>
+        </div>
       </div>
 
       {hasIngredients && (
@@ -380,7 +387,9 @@ export default function HomePage() {
               <div className="text-sm text-gray-500">食材数量</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-accent-600">{recommendations.length}</div>
+              <div className="text-2xl font-bold text-accent-600">
+                {recipePages.length > 0 ? recipePages.reduce((total, page) => total + page.length, 0) : recommendations.length}
+              </div>
               <div className="text-sm text-gray-500">推荐菜谱</div>
             </div>
             <div>
@@ -392,6 +401,39 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {showRecipeRefreshDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <RefreshCw size={32} className="text-primary-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">食材已更改</h3>
+              <p className="text-gray-600">
+                您的食材库存已更新，是否要重新生成菜谱推荐？
+              </p>
+            </div>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setShowRecipeRefreshDialog(false)}
+                className="flex-1 px-6 py-3 border border-gray-300 rounded-xl font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                稍后再说
+              </button>
+              <button
+                onClick={() => {
+                  setShowRecipeRefreshDialog(false);
+                  window.location.href = '/recipes';
+                }}
+                className="flex-1 px-6 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors"
+              >
+                重新推荐
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

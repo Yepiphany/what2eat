@@ -12,9 +12,10 @@ from datetime import timezone
 
 load_dotenv()
 
-MODELSCOPE_BASE_URL = os.getenv("MODELSCOPE_BASE_URL", "https://api-inference.modelscope.cn/v1")
-MODELSCOPE_API_KEY = os.getenv("MODELSCOPE_API_KEY", "")
-MODELSCOPE_VISION_MODEL = os.getenv("MODELSCOPE_VISION_MODEL", "deepseek-ai/DeepSeek-V3.2")
+# 新的 ModelScope API 配置
+MODELSCOPE_BASE_URL = "https://api-inference.modelscope.cn/v1"
+MODELSCOPE_API_KEY = "ms-76b46a1c-253d-45c0-bccd-e91b31bbc460"
+MODELSCOPE_VISION_MODEL = "deepseek-ai/DeepSeek-V3.2"
 
 CACHE_DURATION_HOURS = int(os.getenv("RECIPE_CACHE_HOURS", "24"))
 
@@ -44,51 +45,27 @@ def enhance_recipe_with_matching(recipe: Dict, available_ingredients: List[str])
     return recipe
 
 def get_cached_recipes(ingredients_hash: str) -> Optional[List[Dict]]:
-    try:
-        from models.database import get_supabase_client
-        client = get_supabase_client()
-        if client is None:
-            return None
-        
-        result = client.table("recipe_cache").select("recipes, created_at").eq("ingredients_hash", ingredients_hash).execute()
-        
-        if result.data and len(result.data) > 0:
-            cache_entry = result.data[0]
-            recipes = cache_entry.get("recipes", [])
-            created_at = cache_entry.get("created_at", "")
-            
-            if created_at:
-                cache_time = datetime.fromisoformat(created_at.replace("Z", "+00:00")).replace(tzinfo=timezone.utc)
-                current_time = datetime.now(timezone.utc)
-                if current_time - cache_time < timedelta(hours=CACHE_DURATION_HOURS):
-                    return recipes
-            
-            return recipes
-    except Exception as e:
-        print(f"Database cache lookup failed: {e}")
-    
+    """
+    从缓存获取菜谱。
+    注意：不再从 recipe_pages 表查询，因为分页逻辑由前端管理。
+    缓存逻辑由前端通过 /api/v1/recipe-pages 接口处理。
+    """
+    # 返回 None，让前端决定是否使用缓存
+    # 前端会通过 /api/v1/recipe-pages 接口获取已保存的分页数据
     return None
 
 def save_recipes_to_cache(ingredients_hash: str, ingredients: List[str], recipes: List[Dict], taste_preferences: Optional[List[TastePreference]] = None, diet_type: Optional[DietType] = None):
+    """
+    保存菜谱到缓存。
+    注意：不再保存到 recipe_pages 表，因为分页逻辑由前端管理。
+    前端会通过 /api/v1/recipe-pages 接口来保存分页数据。
+    """
     try:
-        from models.database import get_supabase_client
-        client = get_supabase_client()
-        if client is None:
-            return
-        
-        data = {
-            "ingredients_hash": ingredients_hash,
-            "ingredients_list": ingredients,
-            "recipes": recipes,
-            "taste_preferences": [t.value for t in taste_preferences] if taste_preferences else [],
-            "diet_type": diet_type.value if diet_type else None
-        }
-        
-        client.table("recipe_cache").upsert(data, on_conflict="ingredients_hash").execute()
-        print(f"Saved {len(recipes)} recipes to cache")
-        
+        # 只保存单个菜谱到 recipes 表，用于详情页查询
         for recipe in recipes:
             save_recipe_to_database(recipe)
+        
+        print(f"Saved {len(recipes)} recipes to database (recipe_pages 由前端管理)")
     except Exception as e:
         print(f"Failed to save recipes to cache: {e}")
 

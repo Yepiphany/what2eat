@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Filter, Clock, X, RefreshCw } from 'lucide-react';
+import { Search, Filter, Clock, X, RefreshCw, Trash2 } from 'lucide-react';
 import { useIngredientsStore, useRecipesStore } from '../stores';
 import { recipeApi } from '../services/api';
 import type { Recipe, DietType, TastePreference } from '../types';
@@ -14,16 +14,30 @@ const difficultyOptions = [
 export default function RecipesPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [showExcludeModal, setShowExcludeModal] = useState(false);
-  
-  const { ingredients } = useIngredientsStore();
-  const { recipePages, currentPage, setRecipePages, addRecipePage, setCurrentPage, recommendations, setRecommendations, loadFromDatabase } = useRecipesStore();
+  const [hasInitialLoad, setHasInitialLoad] = useState(false);
+  const [isLoadingFromDb, setIsLoadingFromDb] = useState(false);
+  const [isFirstTimeLoading, setIsFirstTimeLoading] = useState(true);
 
-  const availableIngredientNames = useMemo(() => 
+  const { ingredients } = useIngredientsStore();
+  const { recipePages, currentPage, setRecipePages, addRecipePage, setCurrentPage, recommendations, setRecommendations, loadFromDatabase, clearRecommendations, getRecipePagesLength } = useRecipesStore();
+
+  const availableIngredientNames = useMemo(() =>
     ingredients.map(ing => ing.name)
   , [ingredients]);
   const [excludedIngredients, setExcludedIngredients] = useState<string[]>([]);
+  const hasLoadedRef = useRef(false); // 防止重复加载
+  const isFetchingRef = useRef(false); // 防止并发调用 fetchRecipes
 
+  // 定义 fetchRecipes 函数，使用 useCallback 缓存
   const fetchRecipes = useCallback(async (excludeList: string[] = [], forceRefresh: boolean = false) => {
+    // 防止并发调用
+    if (isFetchingRef.current) {
+      console.log('[DEBUG] fetchRecipes 正在执行中，跳过');
+      return;
+    }
+    
+    console.log('[DEBUG] fetchRecipes 被调用, forceRefresh=', forceRefresh);
+    isFetchingRef.current = true;
     setIsLoading(true);
     
     try {
@@ -36,37 +50,125 @@ export default function RecipesPage() {
         force_refresh: forceRefresh,
       };
       
+      console.log('[DEBUG] 调用 API 获取菜谱...');
       const recipes = await recipeApi.getRecommendations(request);
+      console.log('[DEBUG] API 返回', recipes.length, '道菜谱');
       
       if (forceRefresh) {
-        addRecipePage(recipes);
+        console.log('[DEBUG] 强制刷新，添加新页面');
+        addRecipePage(recipes, availableIngredientNames);
       } else {
-        setRecommendations(recipes);
-        setRecipePages([recipes]);
-        setCurrentPage(0);
+        console.log('[DEBUG] 非强制刷新，检查当前页面数');
+        // 使用 getRecipePagesLength 获取最新状态
+        const currentPagesLength = getRecipePagesLength();
+        console.log('[DEBUG] 当前页面数:', currentPagesLength);
+        if (currentPagesLength === 0) {
+          console.log('[DEBUG] 无缓存，设置新菜谱并保存到数据库');
+          setRecommendations(recipes);
+          setCurrentPage(0);
+          // 只调用 addRecipePage，它会同时更新状态和保存到数据库
+          addRecipePage(recipes, availableIngredientNames);
+        } else {
+          console.log('[DEBUG] 已有页面，跳过设置新菜谱');
+        }
       }
+      // 菜谱加载完成后，设置 isFirstTimeLoading 为 false
+      setIsFirstTimeLoading(false);
     } catch (error) {
       console.error('Failed to fetch recipes:', error);
-      if (recipePages.length === 0) {
-        setRecommendations([]);
-      }
+      setRecipePages(currentPages => {
+        if (currentPages.length === 0) {
+          setRecommendations([]);
+        }
+        return currentPages;
+      });
+      // 即使出错也设置 isFirstTimeLoading 为 false，避免无限加载
+      setIsFirstTimeLoading(false);
     } finally {
       setIsLoading(false);
+      isFetchingRef.current = false;
     }
   }, [availableIngredientNames, setRecommendations, addRecipePage, setCurrentPage, setRecipePages]);
 
+  // 加载数据库数据 - 只在组件挂载和食材变化时执行
   useEffect(() => {
-    if (availableIngredientNames.length > 0) {
-      loadFromDatabase().then(() => {
-        if (recipePages.length === 0) {
-          fetchRecipes([], false);
-        }
-      });
+    // 防止重复加载（React 严格模式会导致组件渲染两次）
+    if (hasLoadedRef.current) {
+      console.log('[DEBUG] 已经加载过，跳过');
+      return;
     }
+    
+    // 只在食材列表非空且尚未加载时执行
+    if (availableIngredientNames.length === 0) {
+      console.log('[DEBUG] 食材列表为空，跳过加载');
+      return;
+    }
+    
+    if (hasInitialLoad) {
+      console.log('[DEBUG] 已经初始化过，跳过加载');
+      return;
+    }
+    
+    if (isLoadingFromDb) {
+      console.log('[DEBUG] 正在加载中，跳过');
+      return;
+    }
+    
+    const loadData = async () => {
+      console.log('[DEBUG] 开始加载数据库, hasLoadedRef=', hasLoadedRef.current);
+      hasLoadedRef.current = true; // 标记已加载
+      setIsLoadingFromDb(true);
+      const loadedPageCount = await loadFromDatabase();
+      console.log('[DEBUG] 数据库加载完成，加载了', loadedPageCount, '页, 类型:', typeof loadedPageCount);
+      setHasInitialLoad(true);
+      setIsLoadingFromDb(false);
+      setIsFirstTimeLoading(false);
+      
+      // 如果数据库中没有数据，则获取新菜谱
+      console.log('[DEBUG] 检查是否需要获取新菜谱: loadedPageCount=', loadedPageCount, ', 条件:', loadedPageCount === 0);
+      if (loadedPageCount === 0) {
+        console.log('[DEBUG] 数据库无数据，获取新菜谱, hasLoadedRef=', hasLoadedRef.current);
+        fetchRecipes([], false);
+      } else {
+        console.log('[DEBUG] 数据库已有数据，跳过获取新菜谱');
+      }
+    };
+    loadData();
+  // 依赖 availableIngredientNames 数组本身，而不仅仅是长度
+  // 但使用 hasLoadedRef 和 hasInitialLoad 来防止重复加载
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availableIngredientNames]);
 
-  const displayRecipes = recipePages[currentPage] || recommendations.slice(0, 5);
+  const displayRecipes = useMemo(() => {
+    if (recipePages.length > 0 && recipePages[currentPage]) {
+      return recipePages[currentPage];
+    }
+    return recommendations.slice(0, 5);
+  }, [recipePages, currentPage, recommendations]);
   const totalPages = recipePages.length;
+
+  useEffect(() => {
+    console.log('[DEBUG] displayRecipes:', {
+      currentPage,
+      totalPages,
+      displayCount: displayRecipes.length,
+      firstRecipe: displayRecipes[0]?.title || 'none',
+      secondRecipe: displayRecipes[1]?.title || 'none',
+      recipePagesLength: recipePages.length,
+      recipePagesStructure: Array.isArray(recipePages) ? recipePages.map((page, i) => ({
+        pageIndex: i,
+        count: page.length,
+        firstTitle: page[0]?.title || 'none',
+        secondTitle: page[1]?.title || 'none'
+      })) : []
+    });
+  }, [currentPage, totalPages, displayRecipes, recipePages]);
+
+  useEffect(() => {
+    if (recipePages.length > 0 && recipePages[currentPage]) {
+      setRecommendations(recipePages[currentPage]);
+    }
+  }, [recipePages, currentPage, setRecommendations]);
 
   const handlePageChange = useCallback((pageIndex: number) => {
     setCurrentPage(pageIndex);
@@ -87,8 +189,22 @@ export default function RecipesPage() {
 
   const handleRefresh = useCallback(() => {
     setExcludedIngredients([]);
-    fetchRecipes([], true);
-  }, [fetchRecipes]);
+    setShowExcludeModal(true);
+  }, []);
+
+  const handleClearRecipes = useCallback(async () => {
+    if (confirm('确定要清空所有菜谱吗？此操作不可撤销。')) {
+      await clearRecommendations();
+      // 重置所有状态，显示暂无菜谱界面
+      setHasInitialLoad(true); // 设置为true，避免触发加载动画
+      setCurrentPage(0);
+      setRecommendations([]);
+      setRecipePages([]);
+      // 重置加载标志，允许重新加载
+      hasLoadedRef.current = false;
+      setIsFirstTimeLoading(false); // 设置为false，显示暂无菜谱界面而不是加载动画
+    }
+  }, [clearRecommendations, setCurrentPage, setRecommendations, setRecipePages]);
 
   const confirmExclude = useCallback(() => {
     setShowExcludeModal(false);
@@ -108,7 +224,7 @@ export default function RecipesPage() {
         </p>
       </header>
 
-      {isLoading ? (
+      {isLoading || isLoadingFromDb || (isFirstTimeLoading && availableIngredientNames.length > 0) ? (
         <div className="flex justify-center py-12">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4" />
@@ -175,22 +291,33 @@ export default function RecipesPage() {
               <RefreshCw size={22} className={isLoading ? 'animate-spin' : ''} />
               <span className="text-lg font-medium">不合胃口？</span>
             </button>
+            <button
+              onClick={handleClearRecipes}
+              disabled={isLoading}
+              className="flex items-center space-x-2 px-6 py-4 bg-red-500 text-white rounded-full hover:bg-red-600 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Trash2 size={20} />
+              <span className="text-lg font-medium">清空菜谱</span>
+            </button>
           </div>
         </>
       ) : (
         <div className="text-center py-12">
-          <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-4xl">🔍</span>
+          <div className="w-72 h-72 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-9xl">🍽️</span>
           </div>
-          <h3 className="text-xl font-semibold text-gray-800 mb-2">
-            没有找到合适的菜谱
+          <h3 className="text-xl font-semibold text-gray-400 mb-8">
+            暂无菜谱推荐
           </h3>
-          <p className="text-gray-500 mb-6 max-w-md mx-auto">
-            尝试添加更多食材到库存中
-          </p>
-          <Link to="/scanner" className="btn-primary">
-            扫描更多食材
-          </Link>
+
+          <button
+            onClick={handleRefresh}
+            disabled={isLoading}
+            className="flex items-center space-x-2 px-8 py-4 bg-primary-500 text-white rounded-full hover:bg-primary-600 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed mx-auto"
+          >
+            <RefreshCw size={22} className={isLoading ? 'animate-spin' : ''} />
+            <span className="text-lg font-medium">获取推荐</span>
+          </button>
         </div>
       )}
 
@@ -271,7 +398,7 @@ function RecipeCard({ recipe, getDifficultyColor }: { recipe: Recipe; getDifficu
           </span>
         </div>
         
-        {recipe.match_percentage && recipe.match_percentage > 0 && (
+        {recipe.match_percentage !== undefined && recipe.match_percentage !== null && (
           <div className="bg-white/90 backdrop-blur-sm rounded-full px-3 py-1 flex items-center space-x-1">
             <span className="text-sm font-medium text-primary-600">
               {recipe.match_percentage}%
@@ -290,23 +417,18 @@ function RecipeCard({ recipe, getDifficultyColor }: { recipe: Recipe; getDifficu
         </p>
         
         <div className="flex flex-wrap gap-1">
-          {recipe.matched_ingredients && recipe.matched_ingredients.length > 0 && (
-            <>
-              {recipe.matched_ingredients.slice(0, 4).map(ing => (
-                <span
-                  key={ing}
-                  className="text-xs px-2 py-0.5 bg-accent-100 text-accent-700 rounded-full"
-                >
-                  ✓ {ing}
-                </span>
-              ))}
-              {recipe.missing_ingredients && recipe.missing_ingredients.length > 0 && (
-                <span className="text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full">
-                  缺: {recipe.missing_ingredients.slice(0, 2).join(', ')}
-                  {recipe.missing_ingredients.length > 2 && ` +${recipe.missing_ingredients.length - 2}`}
-                </span>
-              )}
-            </>
+          {recipe.matched_ingredients && recipe.matched_ingredients.length > 0 && recipe.matched_ingredients.slice(0, 4).map(ing => (
+            <span
+              key={ing}
+              className="text-xs px-2 py-0.5 bg-accent-100 text-accent-700 rounded-full"
+            >
+              ✓ {ing}
+            </span>
+          ))}
+          {recipe.missing_ingredients && recipe.missing_ingredients.length > 0 && (
+            <span className="text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full">
+              缺: {recipe.missing_ingredients.join(', ')}
+            </span>
           )}
         </div>
       </div>

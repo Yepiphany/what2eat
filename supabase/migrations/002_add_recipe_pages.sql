@@ -4,7 +4,7 @@
 -- Create recipe_pages table
 CREATE TABLE IF NOT EXISTS recipe_pages (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL,
     page_index INTEGER NOT NULL DEFAULT 0,
     recipes JSONB NOT NULL DEFAULT '[]',
     ingredients_hash TEXT NOT NULL,

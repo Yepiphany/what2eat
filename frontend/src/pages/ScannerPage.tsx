@@ -16,6 +16,7 @@ export default function ScannerPage() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newIngredient, setNewIngredient] = useState({ name: '', quantity: 1, unit: '个', category: 'other' });
   const [isAdding, setIsAdding] = useState(false);
+  const [showRecipeRefreshDialog, setShowRecipeRefreshDialog] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -54,6 +55,7 @@ export default function ScannerPage() {
     try {
       await ingredientApi.deleteIngredient(ingredientId, userId);
       removeIngredient(ingredientId);
+      setShowRecipeRefreshDialog(true);
     } catch (err) {
       console.error('Failed to delete ingredient:', err);
     }
@@ -69,6 +71,9 @@ export default function ScannerPage() {
       addIngredient(saved);
       setNewIngredient({ name: '', quantity: 1, unit: '个', category: 'other' });
       setShowAddForm(false);
+      console.log('[DEBUG] 设置对话框为 true');
+      setShowRecipeRefreshDialog(true);
+      console.log('[DEBUG] 对话框状态已设置');
     } catch (err) {
       console.error('Failed to add ingredient:', err);
     } finally {
@@ -208,8 +213,8 @@ export default function ScannerPage() {
       if (savedIngredients.length > 0) {
         const allIngredients = await ingredientApi.getIngredients(userId);
         setIngredients(allIngredients);
-        alert(`成功保存 ${savedIngredients.length} 种食材到库存！`);
-        resetScanner();
+        setShowRecipeRefreshDialog(true);
+        setTimeout(() => resetScanner(), 100);
       } else {
         setError('保存失败，请重试');
       }
@@ -624,6 +629,39 @@ export default function ScannerPage() {
           </li>
         </ul>
       </div>
+
+      {showRecipeRefreshDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <RefreshCw size={32} className="text-primary-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">食材已更改</h3>
+              <p className="text-gray-600">
+                您的食材库存已更新，是否要重新生成菜谱推荐？
+              </p>
+            </div>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setShowRecipeRefreshDialog(false)}
+                className="flex-1 px-6 py-3 border border-gray-300 rounded-xl font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                稍后再说
+              </button>
+              <button
+                onClick={() => {
+                  setShowRecipeRefreshDialog(false);
+                  window.location.href = '/recipes';
+                }}
+                className="flex-1 px-6 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors"
+              >
+                重新推荐
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
