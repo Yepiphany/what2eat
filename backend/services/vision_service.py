@@ -9,10 +9,11 @@ load_dotenv()
 
 MODELSCOPE_BASE_URL = os.getenv("MODELSCOPE_BASE_URL", "https://api-inference.modelscope.cn/v1")
 MODELSCOPE_API_KEY = os.getenv("MODELSCOPE_API_KEY", "")
-MODELSCOPE_VISION_MODEL = os.getenv("MODELSCOPE_VISION_MODEL", "moonshotai/Kimi-K2.5")
+MODELSCOPE_VISION_MODEL = "Qwen/Qwen3-VL-30B-A3B-Instruct"
 
 async def analyze_ingredients_image(image_base64: str) -> List[Dict]:
     try:
+        print(f"[VISION] 开始识别图片食材, 模型: {MODELSCOPE_VISION_MODEL}")
         async with httpx.AsyncClient(timeout=120.0) as client:
             response = await client.post(
                 f"{MODELSCOPE_BASE_URL}/chat/completions",
@@ -97,10 +98,14 @@ async def analyze_ingredients_image(image_base64: str) -> List[Dict]:
                                 })
             
             if isinstance(parsed, dict) and "ingredients" in parsed:
-                return parsed["ingredients"]
+                ingredients = parsed["ingredients"]
+                print(f"[VISION] 识别成功, 共 {len(ingredients)} 种食材: {ingredients}")
+                return ingredients
             elif isinstance(parsed, list):
+                print(f"[VISION] 识别成功, 共 {len(parsed)} 种食材: {parsed}")
                 return parsed
             else:
+                print(f"[VISION] 识别结果格式异常: {parsed}")
                 return []
     
     except Exception as e:

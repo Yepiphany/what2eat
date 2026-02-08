@@ -38,6 +38,23 @@ const dietOptions: { value: DietType; label: string; description: string }[] = [
   { value: 'low_carb', label: '低碳水', description: '减少碳水摄入，控制热量' },
 ];
 
+const STORAGE_KEY_SCANNED = 'stats_scanned_ingredients';
+const STORAGE_KEY_VIEWED = 'stats_viewed_recipes';
+
+export const incrementScannedIngredients = (count: number = 1) => {
+  const current = localStorage.getItem(STORAGE_KEY_SCANNED);
+  const newValue = (current ? parseInt(current, 10) : 0) + count;
+  localStorage.setItem(STORAGE_KEY_SCANNED, newValue.toString());
+  return newValue;
+};
+
+export const incrementViewedRecipes = (count: number = 1) => {
+  const current = localStorage.getItem(STORAGE_KEY_VIEWED);
+  const newValue = (current ? parseInt(current, 10) : 0) + count;
+  localStorage.setItem(STORAGE_KEY_VIEWED, newValue.toString());
+  return newValue;
+};
+
 export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -48,6 +65,8 @@ export default function ProfilePage() {
   const [showSettingModal, setShowSettingModal] = useState(false);
   const [activeSetting, setActiveSetting] = useState<'taste' | 'diet' | 'time' | 'level' | null>(null);
   const [selectedLevel, setSelectedLevel] = useState<string | null>(null);
+  const [scannedIngredientsCount, setScannedIngredientsCount] = useState(0);
+  const [viewedRecipesCount, setViewedRecipesCount] = useState(0);
   
   const { currentUser, setUser, isAuthenticated, updatePreferences, logout } = useUserStore();
   const { ingredients } = useIngredientsStore();
@@ -63,6 +82,11 @@ export default function ProfilePage() {
       }
       setSelectedLevel(currentUser.cooking_level || null);
     }
+    
+    const scanned = localStorage.getItem(STORAGE_KEY_SCANNED);
+    const viewed = localStorage.getItem(STORAGE_KEY_VIEWED);
+    setScannedIngredientsCount(scanned ? parseInt(scanned, 10) : 0);
+    setViewedRecipesCount(viewed ? parseInt(viewed, 10) : 0);
   }, [currentUser]);
 
   const handleSave = async () => {
@@ -119,9 +143,9 @@ export default function ProfilePage() {
   };
 
   const stats = {
-    totalIngredients: ingredients.length,
+    totalIngredients: scannedIngredientsCount,
     expiringSoon: ingredients.filter(ing => ing.is_expiring_soon).length,
-    recipesViewed: recommendations.length,
+    recipesViewed: viewedRecipesCount,
     favoriteRecipes: 12,
     cookingSessions: 8,
     totalCookingTime: 320,

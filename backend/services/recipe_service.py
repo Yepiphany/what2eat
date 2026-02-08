@@ -12,10 +12,10 @@ from datetime import timezone
 
 load_dotenv()
 
-# 新的 ModelScope API 配置
+# ModelScope API 配置
 MODELSCOPE_BASE_URL = "https://api-inference.modelscope.cn/v1"
 MODELSCOPE_API_KEY = "ms-76b46a1c-253d-45c0-bccd-e91b31bbc460"
-MODELSCOPE_VISION_MODEL = "ZhipuAI/GLM-4.7-Flash"
+MODELSCOPE_VISION_MODEL = "Qwen/Qwen3-VL-30B-A3B-Instruct"
 
 CACHE_DURATION_HOURS = int(os.getenv("RECIPE_CACHE_HOURS", "24"))
 _RECIPES_MEMORY: dict = {}

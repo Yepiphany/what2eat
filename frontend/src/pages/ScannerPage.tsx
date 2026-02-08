@@ -3,12 +3,14 @@ import { Camera, Upload, X, RefreshCw, Check, AlertTriangle, Plus, List, Trash2 
 import { useIngredientsStore } from '../stores';
 import { ingredientApi } from '../services/api';
 import type { Ingredient } from '../types';
+import { incrementScannedIngredients } from './ProfilePage';
 
 export default function ScannerPage() {
   const [mode, setMode] = useState<'camera' | 'upload'>('camera');
   const [viewMode, setViewMode] = useState<'scan' | 'inventory'>('scan');
   const [isScanning, setIsScanning] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [detectedIngredients, setDetectedIngredients] = useState<Partial<Ingredient>[]>([]);
@@ -198,7 +200,7 @@ export default function ScannerPage() {
       return;
     }
     
-    setIsAnalyzing(true);
+    setIsSaving(true);
     setError(null);
     
     try {
@@ -216,6 +218,7 @@ export default function ScannerPage() {
       if (savedIngredients.length > 0) {
         const allIngredients = await ingredientApi.getIngredients(userId);
         setIngredients(allIngredients);
+        incrementScannedIngredients(savedIngredients.length);
         setShowRecipeRefreshDialog(true);
         setTimeout(() => resetScanner(), 100);
       } else {
@@ -225,7 +228,7 @@ export default function ScannerPage() {
       console.error('Save error:', err);
       setError('保存失败，请检查网络连接');
     } finally {
-      setIsAnalyzing(false);
+      setIsSaving(false);
     }
   };
 
@@ -470,6 +473,15 @@ export default function ScannerPage() {
                 <div className="text-center text-white">
                   <RefreshCw size={48} className="animate-spin mx-auto mb-4" />
                   <p className="text-lg font-medium">AI正在识别食材...</p>
+                </div>
+              </div>
+            )}
+            
+            {isSaving && !isAnalyzing && (
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                <div className="text-center text-white">
+                  <RefreshCw size={48} className="animate-spin mx-auto mb-4" />
+                  <p className="text-lg font-medium">正在将食材加入库存...</p>
                 </div>
               </div>
             )}

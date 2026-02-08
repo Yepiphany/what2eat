@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   Clock,
@@ -17,6 +17,7 @@ import {
 import { recipeApi } from '../services/api';
 import { useCookingStore, useUserStore } from '../stores';
 import type { Recipe } from '../types';
+import { incrementViewedRecipes } from './ProfilePage';
 
 const difficultyLabels = {
   easy: { text: '简单', color: 'bg-green-100 text-green-700' },
@@ -77,13 +78,16 @@ export default function RecipeDetailPage() {
   const [isInShoppingList, setIsInShoppingList] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const hasViewedRef = useRef(false);
   
   const { currentSession, setSession } = useCookingStore();
   const { currentUser } = useUserStore();
 
   useEffect(() => {
-    if (id) {
+    if (id && !hasViewedRef.current) {
+      hasViewedRef.current = true;
       fetchRecipe(id);
+      incrementViewedRecipes();
     }
   }, [id]);
 
