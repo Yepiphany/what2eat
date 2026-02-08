@@ -32,13 +32,10 @@ const tasteOptions: { value: TastePreference; label: string; emoji: string; colo
 ];
 
 const dietOptions: { value: DietType; label: string; description: string }[] = [
-  { value: 'normal', label: '普通饮食', description: '无特殊限制，均衡饮食' },
-  { value: 'keto', label: '生酮饮食', description: '低碳水、高脂肪、适量蛋白' },
-  { value: 'low_carb', label: '低碳水', description: '减少碳水化合物摄入' },
-  { value: 'low_fat', label: '低脂饮食', description: '减少脂肪摄入' },
+  { value: 'normal', label: '普通饮食', description: '均衡饮食' },
   { value: 'vegetarian', label: '素食', description: '不吃肉类，可吃蛋奶' },
   { value: 'vegan', label: '纯素', description: '不吃任何动物制品' },
-  { value: 'paleo', label: '原始人饮食', description: '模拟史前人类饮食方式' },
+  { value: 'low_carb', label: '低碳水', description: '减少碳水摄入' },
 ];
 
 export default function ProfilePage() {
@@ -48,7 +45,9 @@ export default function ProfilePage() {
   const [selectedTastes, setSelectedTastes] = useState<TastePreference[]>([]);
   const [selectedDiet, setSelectedDiet] = useState<DietType | null>(null);
   const [maxCookingTime, setMaxCookingTime] = useState<number>(60);
-  const [showPreferencesModal, setShowPreferencesModal] = useState(false);
+  const [showSettingModal, setShowSettingModal] = useState(false);
+  const [activeSetting, setActiveSetting] = useState<'taste' | 'diet' | 'time' | 'level' | null>(null);
+  const [selectedLevel, setSelectedLevel] = useState<string | null>(null);
   
   const { currentUser, setUser, isAuthenticated, updatePreferences, logout } = useUserStore();
   const { ingredients } = useIngredientsStore();
@@ -62,6 +61,7 @@ export default function ProfilePage() {
       if (currentUser.max_cooking_time) {
         setMaxCookingTime(currentUser.max_cooking_time);
       }
+      setSelectedLevel(currentUser.cooking_level || null);
     }
   }, [currentUser]);
 
@@ -69,17 +69,17 @@ export default function ProfilePage() {
     setIsSaving(true);
     try {
       if (currentUser) {
-        const updatedUser = await userApi.updatePreferences(currentUser.id, {
-          taste_preferences: selectedTastes as string[],
-          diet_type: selectedDiet || undefined,
-          max_cooking_time: maxCookingTime,
-        });
+        const payload: any = {};
+        if (activeSetting === 'taste') payload.taste_preferences = selectedTastes as string[];
+        if (activeSetting === 'diet') payload.diet_type = selectedDiet || undefined;
+        if (activeSetting === 'time') payload.max_cooking_time = maxCookingTime;
+        if (activeSetting === 'level') payload.cooking_level = selectedLevel || undefined;
+        const updatedUser = await userApi.updatePreferences(currentUser.id, payload);
         setUser(updatedUser);
-        updatePreferences({
-          tastePreferences: selectedTastes,
-          dietType: selectedDiet || null,
-          maxCookingTime,
-        });
+        if (activeSetting === 'taste') updatePreferences({ tastePreferences: selectedTastes });
+        if (activeSetting === 'diet') updatePreferences({ dietType: selectedDiet || null });
+        if (activeSetting === 'time') updatePreferences({ maxCookingTime });
+        if (activeSetting === 'level') updatePreferences({ cookingLevel: selectedLevel || null });
       }
       setIsEditing(false);
     } catch (error) {
@@ -87,19 +87,21 @@ export default function ProfilePage() {
       if (currentUser) {
         setUser({
           ...currentUser,
-          taste_preferences: selectedTastes,
-          diet_type: selectedDiet || undefined,
-          max_cooking_time: maxCookingTime,
+          taste_preferences: activeSetting === 'taste' ? selectedTastes : currentUser.taste_preferences,
+          diet_type: activeSetting === 'diet' ? (selectedDiet || undefined) : currentUser.diet_type,
+          max_cooking_time: activeSetting === 'time' ? maxCookingTime : currentUser.max_cooking_time,
+          cooking_level: activeSetting === 'level' ? (selectedLevel || undefined) : currentUser.cooking_level,
           updated_at: new Date().toISOString() as any,
         } as any);
-        updatePreferences({
-          tastePreferences: selectedTastes,
-          dietType: selectedDiet || null,
-          maxCookingTime,
-        });
+        if (activeSetting === 'taste') updatePreferences({ tastePreferences: selectedTastes });
+        if (activeSetting === 'diet') updatePreferences({ dietType: selectedDiet || null });
+        if (activeSetting === 'time') updatePreferences({ maxCookingTime });
+        if (activeSetting === 'level') updatePreferences({ cookingLevel: selectedLevel || null });
       }
     } finally {
       setIsSaving(false);
+      setShowSettingModal(false);
+      setActiveSetting(null);
     }
   };
 
@@ -220,7 +222,7 @@ export default function ProfilePage() {
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
               <button
-                onClick={() => setShowPreferencesModal(true)}
+                onClick={() => { setActiveSetting('taste'); setShowSettingModal(true); }}
                 className="p-4 bg-primary-50 rounded-xl text-center hover:bg-primary-100 transition-colors"
               >
                 <div className="text-2xl mb-1">🍽️</div>
@@ -229,7 +231,7 @@ export default function ProfilePage() {
               </button>
               
               <button
-                onClick={() => setShowPreferencesModal(true)}
+                onClick={() => { setActiveSetting('diet'); setShowSettingModal(true); }}
                 className="p-4 bg-accent-50 rounded-xl text-center hover:bg-accent-100 transition-colors"
               >
                 <div className="text-2xl mb-1">🥗</div>
@@ -239,17 +241,23 @@ export default function ProfilePage() {
                 <div className="text-sm text-gray-500">饮食类型</div>
               </button>
               
-              <div className="p-4 bg-purple-50 rounded-xl text-center">
+              <button
+                onClick={() => { setActiveSetting('time'); setShowSettingModal(true); }}
+                className="p-4 bg-purple-50 rounded-xl text-center hover:bg-purple-100 transition-colors"
+              >
                 <div className="text-2xl mb-1">⏱️</div>
                 <div className="text-lg font-bold text-purple-600">{maxCookingTime}</div>
                 <div className="text-sm text-gray-500">最大时间(分)</div>
-              </div>
+              </button>
               
-              <div className="p-4 bg-orange-50 rounded-xl text-center">
+              <button
+                onClick={() => { setActiveSetting('level'); setShowSettingModal(true); }}
+                className="p-4 bg-orange-50 rounded-xl text-center hover:bg-orange-100 transition-colors"
+              >
                 <div className="text-2xl mb-1">📅</div>
-                <div className="text-lg font-bold text-orange-600">初级</div>
+                <div className="text-lg font-bold text-orange-600">{selectedLevel ? ({ beginner: '初级', intermediate: '中级', advanced: '高级' } as any)[selectedLevel] : '未设置'}</div>
                 <div className="text-sm text-gray-500">烹饪水平</div>
-              </div>
+              </button>
             </div>
 
           </div>
@@ -308,14 +316,19 @@ export default function ProfilePage() {
           </button>
         </div>
 
-      {showPreferencesModal && (
+      {showSettingModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b sticky top-0 bg-white z-10">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-gray-800">口味偏好设置</h2>
+                <h2 className="text-xl font-bold text-gray-800">
+                  {activeSetting === 'taste' && '口味偏好设置'}
+                  {activeSetting === 'diet' && '饮食类型设置'}
+                  {activeSetting === 'time' && '最大烹饪时间'}
+                  {activeSetting === 'level' && '烹饪水平设置'}
+                </h2>
                 <button
-                  onClick={() => setShowPreferencesModal(false)}
+                  onClick={() => setShowSettingModal(false)}
                   className="p-2 hover:bg-gray-100 rounded-full"
                 >
                   <X size={20} className="text-gray-500" />
@@ -324,67 +337,100 @@ export default function ProfilePage() {
             </div>
             
             <div className="p-6 space-y-6">
-              <div>
-                <h3 className="font-medium text-gray-800 mb-3">选择你喜欢的口味</h3>
-                <div className="flex flex-wrap gap-2">
-                  {tasteOptions.map(option => (
-                    <button
-                      key={option.value}
-                      onClick={() => toggleTaste(option.value)}
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                        selectedTastes.includes(option.value)
-                          ? 'bg-primary-500 text-white shadow-md'
-                          : `${option.color} hover:opacity-80`
-                      }`}
-                    >
-                      {option.emoji} {option.label}
-                    </button>
-                  ))}
+              {activeSetting === 'taste' && (
+                <div>
+                  <h3 className="font-medium text-gray-800 mb-3">选择你喜欢的口味</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {tasteOptions.map(option => (
+                      <button
+                        key={option.value}
+                        onClick={() => toggleTaste(option.value)}
+                        className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                          selectedTastes.includes(option.value)
+                            ? 'bg-primary-500 text-white shadow-md'
+                            : `${option.color} hover:opacity-80`
+                        }`}
+                      >
+                        {option.emoji} {option.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-
-              <div>
-                <h3 className="font-medium text-gray-800 mb-3">饮食类型</h3>
-                <div className="space-y-2">
-                  {dietOptions.map(option => (
-                    <button
-                      key={option.value}
-                      onClick={() => setSelectedDiet(selectedDiet === option.value ? null : option.value)}
-                      className={`w-full p-4 rounded-xl text-left transition-all ${
-                        selectedDiet === option.value
-                          ? 'bg-primary-50 border-2 border-primary-500'
-                          : 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-gray-800">{option.label}</span>
-                        {selectedDiet === option.value && (
-                          <Check size={20} className="text-primary-600" />
-                        )}
-                      </div>
-                      <p className="text-sm text-gray-500 mt-1">{option.description}</p>
-                    </button>
-                  ))}
+              )}
+              {activeSetting === 'diet' && (
+                <div>
+                  <h3 className="font-medium text-gray-800 mb-3">饮食类型</h3>
+                  <div className="space-y-2">
+                    {dietOptions.map(option => (
+                      <button
+                        key={option.value}
+                        onClick={() => setSelectedDiet(selectedDiet === option.value ? null : option.value)}
+                        className={`w-full p-4 rounded-xl text-left transition-all ${
+                          selectedDiet === option.value
+                            ? 'bg-primary-50 border-2 border-primary-500'
+                            : 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-gray-800">{option.label}</span>
+                          {selectedDiet === option.value && (
+                            <Check size={20} className="text-primary-600" />
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-500 mt-1">{option.description}</p>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-
-              <div>
-                <h3 className="font-medium text-gray-800 mb-3">最大烹饪时间</h3>
-                <input
-                  type="range"
-                  min="15"
-                  max="120"
-                  step="15"
-                  value={maxCookingTime}
-                  onChange={(e) => setMaxCookingTime(parseInt(e.target.value))}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-sm text-gray-500 mt-1">
-                  <span>15分钟</span>
-                  <span className="font-medium text-primary-600">{maxCookingTime}分钟</span>
-                  <span>120分钟</span>
+              )}
+              {activeSetting === 'time' && (
+                <div>
+                  <h3 className="font-medium text-gray-800 mb-3">最大烹饪时间</h3>
+                  <input
+                    type="range"
+                    min="15"
+                    max="120"
+                    step="15"
+                    value={maxCookingTime}
+                    onChange={(e) => setMaxCookingTime(parseInt(e.target.value))}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-sm text-gray-500 mt-1">
+                    <span>15分钟</span>
+                    <span className="font-medium text-primary-600">{maxCookingTime}分钟</span>
+                    <span>120分钟</span>
+                  </div>
                 </div>
-              </div>
+              )}
+              {activeSetting === 'level' && (
+                <div>
+                  <h3 className="font-medium text-gray-800 mb-3">烹饪水平</h3>
+                  <div className="space-y-2">
+                    {[
+                      { value: 'beginner', label: '初级' },
+                      { value: 'intermediate', label: '中级' },
+                      { value: 'advanced', label: '高级' },
+                    ].map(option => (
+                      <button
+                        key={option.value}
+                        onClick={() => setSelectedLevel(selectedLevel === option.value ? null : option.value)}
+                        className={`w-full p-4 rounded-xl text-left transition-all ${
+                          selectedLevel === option.value
+                            ? 'bg-primary-50 border-2 border-primary-500'
+                            : 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-gray-800">{option.label}</span>
+                          {selectedLevel === option.value && (
+                            <Check size={20} className="text-primary-600" />
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="p-6 border-t sticky bottom-0 bg-white">
