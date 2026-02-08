@@ -257,7 +257,9 @@ export const userApi = {
       cooking_level?: string;
     }
   ): Promise<User> => {
-    const response = await api.put(`/users/${userId}/preferences`, null, { params: preferences });
+    const validUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const uid = validUuid.test(userId) ? userId : '00000000-0000-0000-0000-000000000000';
+    const response = await api.put(`/users/${uid}/preferences`, null, { params: preferences });
     return response.data;
   },
 

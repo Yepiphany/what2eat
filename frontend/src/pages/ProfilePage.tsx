@@ -75,10 +75,29 @@ export default function ProfilePage() {
           max_cooking_time: maxCookingTime,
         });
         setUser(updatedUser);
+        updatePreferences({
+          tastePreferences: selectedTastes,
+          dietType: selectedDiet || null,
+          maxCookingTime,
+        });
       }
       setIsEditing(false);
     } catch (error) {
       console.error('Failed to save preferences:', error);
+      if (currentUser) {
+        setUser({
+          ...currentUser,
+          taste_preferences: selectedTastes,
+          diet_type: selectedDiet || undefined,
+          max_cooking_time: maxCookingTime,
+          updated_at: new Date().toISOString() as any,
+        } as any);
+        updatePreferences({
+          tastePreferences: selectedTastes,
+          dietType: selectedDiet || null,
+          maxCookingTime,
+        });
+      }
     } finally {
       setIsSaving(false);
     }
@@ -117,7 +136,7 @@ export default function ProfilePage() {
         <button
           onClick={() => {
             const demoUser = {
-              id: 'demo_user',
+              id: '00000000-0000-0000-0000-000000000000',
               username: '美食爱好者',
               email: undefined,
               avatar_url: undefined,
@@ -129,6 +148,9 @@ export default function ProfilePage() {
               updated_at: new Date().toISOString(),
             };
             setUser(demoUser);
+            try {
+              localStorage.setItem('user_id', demoUser.id);
+            } catch {}
           }}
           className="btn-primary"
         >
@@ -147,7 +169,7 @@ export default function ProfilePage() {
       {/* merged sections: personal, stats, settings */}
 
       <div className="space-y-6">
-          <div className="card p-6">
+        <div className="card p-6">
             <div className="flex items-start justify-between mb-6">
               <div className="flex items-center space-x-4">
                 <div className="relative">
@@ -230,20 +252,10 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            <button
-              onClick={() => setShowPreferencesModal(true)}
-              className="w-full btn-secondary flex items-center justify-center space-x-2"
-            >
-              <Settings size={18} />
-              <span>管理口味偏好和饮食设置</span>
-            </button>
           </div>
 
-          {/* removed quick entries */}
-        </div>
-
-      <div className="space-y-6">
-          <div className="card p-6">
+        {/* stats */}
+        <div className="card p-6">
             <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
               <TrendingUp size={20} className="mr-2 text-primary-600" />
               本周统计
@@ -267,68 +279,8 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div className="card p-6">
-            <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
-              <Calendar size={20} className="mr-2 text-primary-600" />
-              烹饪时间统计
-            </h3>
-            
-            <div className="flex items-center justify-center py-8">
-              <div className="relative">
-                <div className="w-40 h-40 rounded-full border-8 border-primary-100 flex items-center justify-center">
-                  <div className="w-32 h-32 rounded-full border-8 border-primary-500 flex items-center justify-center">
-                    <div className="text-center">
-                      <div className="text-3xl font-bold text-primary-600">{Math.floor(stats.totalCookingTime / 60)}</div>
-                      <div className="text-sm text-gray-500">小时</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-4 gap-2 text-center">
-              {['周一', '周二', '周三', '周四', '周五', '周六', '周日'].map((day, i) => {
-                const heights = [40, 70, 50, 80, 60, 90, 45];
-                const maxHeight = Math.max(...heights);
-                const height = heights[i];
-                
-                return (
-                  <div key={day} className="flex flex-col items-center">
-                    <div
-                      className="w-8 bg-primary-500 rounded-t-md transition-all"
-                      style={{ height: `${(height / maxHeight) * 80}px` }}
-                    />
-                    <span className="text-xs text-gray-500 mt-1">{day.slice(1)}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="card p-6">
-            <h3 className="font-semibold text-gray-800 mb-4">最近活动</h3>
-            <div className="space-y-3">
-              {[
-                { action: '完成烹饪', item: '番茄炒蛋', time: '2小时前', icon: '🍳' },
-                { action: '收藏菜谱', item: '麻婆豆腐', time: '5小时前', icon: '❤️' },
-                { action: '扫描食材', item: '5种新食材', time: '1天前', icon: '📸' },
-                { action: '设置偏好', item: '口味：辣', time: '2天前', icon: '⚙️' },
-              ].map((activity, i) => (
-                <div key={i} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                  <span className="text-2xl">{activity.icon}</span>
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-800">{activity.action}</p>
-                    <p className="text-sm text-gray-500">{activity.item}</p>
-                  </div>
-                  <span className="text-xs text-gray-400">{activity.time}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-      <div className="space-y-6">
-          <div className="card divide-y">
+        {/* settings + about */}
+        <div className="card divide-y">
             <button className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
               <div className="flex items-center space-x-3">
                 <HelpCircle size={20} className="text-primary-600" />
@@ -341,9 +293,9 @@ export default function ProfilePage() {
           <div className="card p-6">
             <h3 className="font-semibold text-gray-800 mb-4">关于</h3>
             <div className="space-y-2 text-sm text-gray-600">
-              <p>版本：1.0.0</p>
+              <p>版本：0.1.0</p>
               <p>构建时间：2026年2月</p>
-              <p className="text-primary-600">检查更新</p>
+              <button className="text-primary-600" onClick={() => alert('已是最新版本')}>检查更新</button>
             </div>
           </div>
 

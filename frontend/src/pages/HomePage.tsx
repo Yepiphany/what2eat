@@ -117,7 +117,7 @@ export default function HomePage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Link
           to="/scanner"
-          className="card p-8 group hover:border-2 hover:border-primary-500 min-h-[160px] flex items-center"
+          className="card p-8 group border-2 border-transparent hover:border-primary-500 min-h-[160px] flex items-center"
         >
           <div className="flex items-center space-x-6 w-full">
             <div className="w-32 h-32 bg-primary-100 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -136,7 +136,7 @@ export default function HomePage() {
         <div className="flex flex-col gap-6">
           <Link
             to="/recipes"
-            className="card p-6 group hover:border-2 hover:border-accent-500"
+            className="card p-6 group border-2 border-transparent hover:border-accent-500"
           >
             <div className="flex items-center space-x-4">
               <div className="w-16 h-16 bg-accent-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -152,7 +152,7 @@ export default function HomePage() {
 
           <Link
             to="/profile"
-            className="card p-6 group hover:border-2 hover:border-purple-500"
+            className="card p-6 group border-2 border-transparent hover:border-purple-500"
           >
             <div className="flex items-center space-x-4">
               <div className="w-16 h-16 bg-purple-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
