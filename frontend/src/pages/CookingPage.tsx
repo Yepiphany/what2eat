@@ -18,7 +18,8 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { cookingApi } from '../services/api';
-import { useCookingStore, useUserStore } from '../stores';
+import { useCookingStore } from '../stores';
+import { getUserId } from '../utils/userId';
 import type { CookingSession, CookingStep } from '../types';
 
 const voiceCommands = [
@@ -49,17 +50,16 @@ export default function CookingPage() {
   const stepTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   const { currentSession, setSession: setGlobalSession, clearSession } = useCookingStore();
-  const { currentUser } = useUserStore();
 
   useEffect(() => {
-    if (recipeId && currentUser) {
+    if (recipeId) {
       fetchOrCreateSession();
     }
     
     return () => {
       cleanup();
     };
-  }, [recipeId, currentUser]);
+  }, [recipeId]);
 
   useEffect(() => {
     if (isListening && isVoiceEnabled) {
@@ -115,7 +115,7 @@ export default function CookingPage() {
         setSession(currentSession);
         setElapsedTime(calculateElapsedTime(currentSession));
       } else {
-        const newSession = await cookingApi.startSession(recipeId!, currentUser!.id);
+        const newSession = await cookingApi.startSession(recipeId!, getUserId());
         setSession(newSession);
         setGlobalSession(newSession);
       }
@@ -179,12 +179,12 @@ export default function CookingPage() {
   };
 
   const advanceStep = async () => {
-    if (!session || !currentUser) return;
+    if (!session) return;
     
     try {
       const updatedSession = await cookingApi.advanceStep(
         session.id,
-        currentUser.id,
+        getUserId(),
         undefined,
         true
       );
@@ -198,10 +198,10 @@ export default function CookingPage() {
   };
 
   const pauseCooking = async () => {
-    if (!session || !currentUser) return;
+    if (!session) return;
     
     try {
-      const updatedSession = await cookingApi.pauseSession(session.id, currentUser.id);
+      const updatedSession = await cookingApi.pauseSession(session.id, getUserId());
       setSession(updatedSession);
       setGlobalSession(updatedSession);
       setIsTimerRunning(false);
@@ -211,10 +211,10 @@ export default function CookingPage() {
   };
 
   const resumeCooking = async () => {
-    if (!session || !currentUser) return;
+    if (!session) return;
     
     try {
-      const updatedSession = await cookingApi.resumeSession(session.id, currentUser.id);
+      const updatedSession = await cookingApi.resumeSession(session.id, getUserId());
       setSession(updatedSession);
       setGlobalSession(updatedSession);
       setIsTimerRunning(true);
@@ -224,12 +224,12 @@ export default function CookingPage() {
   };
 
   const restartCooking = async () => {
-    if (!session || !currentUser) return;
+    if (!session) return;
     
     try {
-      const updatedSession = await cookingApi.completeSession(session.id, currentUser.id);
+      const updatedSession = await cookingApi.completeSession(session.id, getUserId());
       clearSession();
-      const newSession = await cookingApi.startSession(recipeId!, currentUser.id);
+      const newSession = await cookingApi.startSession(recipeId!, getUserId());
       setSession(newSession);
       setGlobalSession(newSession);
       setElapsedTime(0);

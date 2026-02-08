@@ -4,6 +4,7 @@ import { useIngredientsStore, useRecipesStore } from '../stores';
 import { ingredientApi } from '../services/api';
 import type { Ingredient } from '../types';
 import { incrementScannedIngredients } from './ProfilePage';
+import { getUserId } from '../utils/userId';
 
 export default function ScannerPage() {
   const [mode, setMode] = useState<'camera' | 'upload'>('camera');
@@ -45,9 +46,8 @@ export default function ScannerPage() {
   }, [viewMode]);
 
   const loadAllIngredients = async () => {
-    const userId = localStorage.getItem('user_id') || '00000000-0000-0000-0000-000000000000';
     try {
-      const data = await ingredientApi.getIngredients(userId);
+      const data = await ingredientApi.getIngredients(getUserId());
       setIngredients(data);
     } catch (err) {
       console.error('Failed to load ingredients:', err);
@@ -58,9 +58,8 @@ export default function ScannerPage() {
     if (!confirm('确定要删除这个食材吗？')) {
       return;
     }
-    const userId = localStorage.getItem('user_id') || '00000000-0000-0000-0000-000000000000';
     try {
-      await ingredientApi.deleteIngredient(ingredientId, userId);
+      await ingredientApi.deleteIngredient(ingredientId, getUserId());
       removeIngredient(ingredientId);
       setShowRecipeRefreshDialog(true);
     } catch (err) {
@@ -73,8 +72,7 @@ export default function ScannerPage() {
     
     setIsAdding(true);
     try {
-      const userId = localStorage.getItem('user_id') || '00000000-0000-0000-0000-000000000000';
-      const saved = await ingredientApi.addIngredient(newIngredient as Partial<Ingredient>, userId);
+      const saved = await ingredientApi.addIngredient(newIngredient as Partial<Ingredient>, getUserId());
       addIngredient(saved);
       setNewIngredient({ name: '', quantity: 1, unit: '个', category: 'other' });
       setShowAddForm(false);
@@ -194,7 +192,6 @@ export default function ScannerPage() {
   };
 
   const saveIngredients = async () => {
-    const userId = localStorage.getItem('user_id') || '00000000-0000-0000-0000-000000000000';
     const validIngredients = detectedIngredients.filter(ing => ing.name && ing.name.trim() !== '');
     
     if (validIngredients.length === 0) {
@@ -207,10 +204,11 @@ export default function ScannerPage() {
     
     try {
       const savedIngredients = [];
+      const currentUserId = getUserId();
       
       for (const ingredient of validIngredients) {
         try {
-          const saved = await ingredientApi.addIngredient(ingredient as Partial<Ingredient>, userId);
+          const saved = await ingredientApi.addIngredient(ingredient as Partial<Ingredient>, currentUserId);
           savedIngredients.push(saved);
         } catch (err) {
           console.error('Failed to save ingredient:', ingredient.name, err);
@@ -218,7 +216,7 @@ export default function ScannerPage() {
       }
       
       if (savedIngredients.length > 0) {
-        const allIngredients = await ingredientApi.getIngredients(userId);
+        const allIngredients = await ingredientApi.getIngredients(currentUserId);
         setIngredients(allIngredients);
         incrementScannedIngredients(savedIngredients.length);
         setShowRecipeRefreshDialog(true);

@@ -14,9 +14,32 @@ import json
 router = APIRouter()
 supabase = get_supabase_client()
 
+def ensure_user_exists(user_id: str) -> bool:
+    """Check if user exists, if not create a placeholder user"""
+    try:
+        from models.database import get_supabase_client
+        supabase = get_supabase_client()
+        if supabase is None:
+            return False
+        result = supabase.table("users").select("id").eq("id", user_id).execute()
+        if result.data:
+            return True
+        
+        supabase.table("users").insert({
+            "id": user_id,
+            "username": f"User_{user_id[:8]}",
+            "email": None
+        }).execute()
+        print(f"[INFO] Auto-created user record: {user_id[:8]}...")
+        return True
+    except Exception as e:
+        print(f"[WARN] Failed to ensure user exists: {e}")
+        return False
+
 @router.post("/session", response_model=CookingSessionResponse)
 async def start_cooking_session(session: CookingSessionCreate):
     try:
+        ensure_user_exists(session.user_id)
         result = await create_session(session.recipe_id, session.user_id)
         return result
     except Exception as e:

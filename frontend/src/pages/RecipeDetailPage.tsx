@@ -14,8 +14,9 @@ import {
   X,
   Plus
 } from 'lucide-react';
-import { recipeApi } from '../services/api';
-import { useCookingStore, useUserStore } from '../stores';
+import { recipeApi, cookingApi } from '../services/api';
+import { getUserId } from '../utils/userId';
+import { useCookingStore } from '../stores';
 import type { Recipe } from '../types';
 import { incrementViewedRecipes } from './ProfilePage';
 
@@ -81,7 +82,6 @@ export default function RecipeDetailPage() {
   const hasViewedRef = useRef(false);
   
   const { currentSession, setSession } = useCookingStore();
-  const { currentUser } = useUserStore();
 
   useEffect(() => {
     if (id && !hasViewedRef.current) {
@@ -111,7 +111,7 @@ export default function RecipeDetailPage() {
 
   const checkShoppingList = async () => {
     try {
-      const lists = await recipeApi.getShoppingLists('pending');
+      const lists = await recipeApi.getShoppingLists(getUserId(), 'pending');
       const exists = lists.some((list: any) => list.recipe_id === id);
       setIsInShoppingList(exists);
     } catch (error) {
@@ -120,13 +120,13 @@ export default function RecipeDetailPage() {
   };
 
   const startCooking = async () => {
-    if (!recipe || !currentUser) {
+    if (!recipe) {
       navigate('/profile');
       return;
     }
 
     try {
-      const session = await cookingApi.startSession(recipe.id, currentUser.id);
+      const session = await cookingApi.startSession(recipe.id, getUserId());
       setSession(session);
       navigate(`/cooking/${recipe.id}`);
     } catch (error) {
@@ -145,7 +145,11 @@ export default function RecipeDetailPage() {
 
     setIsAdding(true);
     try {
-      await recipeApi.addToShoppingList(recipe.id, recipe.missing_ingredients, recipe.title);
+      await recipeApi.addToShoppingList(getUserId(), {
+        recipe_id: recipe.id,
+        items: recipe.missing_ingredients,
+        recipe_title: recipe.title
+      });
       setIsInShoppingList(true);
       alert('已添加到采购清单');
     } catch (error) {

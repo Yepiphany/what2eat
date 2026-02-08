@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Ingredient, Recipe, CookingSession, User } from '../types';
+import { getUserId } from '../utils/userId';
 
 interface IngredientsStore {
   ingredients: Ingredient[];
@@ -50,8 +51,7 @@ export const useIngredientsStore = create<IngredientsStore>()(
         set({ ingredients: [] });
         try {
           const { ingredientApi } = await import('../services/api');
-          const userId = localStorage.getItem('user_id') || '00000000-0000-0000-0000-000000000000';
-          await ingredientApi.clearAllIngredients(userId);
+          await ingredientApi.clearAllIngredients(getUserId());
         } catch (e) {
           console.error('Failed to clear ingredients from database:', e);
         }
@@ -108,7 +108,7 @@ export const useRecipesStore = create<RecipesStore>()(
 
         try {
           const { recipeApi } = await import('../services/api');
-          const response = await recipeApi.saveRecipePage({
+          const response = await recipeApi.saveRecipePage(getUserId(), {
             page_index: newPages.length - 1,
             recipes: page,
             ingredients,
@@ -137,7 +137,7 @@ export const useRecipesStore = create<RecipesStore>()(
         
         try {
           const { recipeApi } = await import('../services/api');
-          await recipeApi.clearRecipePages();
+          await recipeApi.clearRecipePages(getUserId());
         } catch (e) {
           console.error('Failed to clear recipe pages:', e);
         }
@@ -147,7 +147,7 @@ export const useRecipesStore = create<RecipesStore>()(
         try {
           console.log('[DEBUG] loadFromDatabase 开始...');
           const { recipeApi } = await import('../services/api');
-          const data = await recipeApi.getRecipePages();
+          const data = await recipeApi.getRecipePages(getUserId());
           console.log('[DEBUG] loadFromDatabase 返回:', data);
           const pages = data.pages || [];
           const state = get();

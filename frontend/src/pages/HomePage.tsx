@@ -4,6 +4,7 @@ import { Scan, Utensils, ChefHat, ArrowRight, Sparkles, Plus, X, ShoppingCart, C
 import { useIngredientsStore, useRecipesStore } from '../stores';
 import { ingredientApi, recipeApi } from '../services/api';
 import type { Ingredient } from '../types';
+import { getUserId } from '../utils/userId';
 
 export default function HomePage() {
   const { ingredients, addIngredient, setIngredients, removeIngredient, clearIngredients } = useIngredientsStore();
@@ -28,7 +29,7 @@ export default function HomePage() {
 
   const loadShoppingLists = async () => {
     try {
-      const lists = await recipeApi.getShoppingLists('pending');
+      const lists = await recipeApi.getShoppingLists(getUserId(), 'pending');
       setShoppingLists(lists);
     } catch (error) {
       console.error('Failed to load shopping lists:', error);
@@ -59,8 +60,7 @@ export default function HomePage() {
     
     setIsAdding(true);
     try {
-      const userId = localStorage.getItem('user_id') || '00000000-0000-0000-0000-000000000000';
-      const saved = await ingredientApi.addIngredient(newIngredient as Partial<Ingredient>, userId);
+      const saved = await ingredientApi.addIngredient(newIngredient as Partial<Ingredient>, getUserId());
       addIngredient(saved);
       setNewIngredient({ name: '', quantity: 1, unit: '个' });
       setShowAddForm(false);
@@ -76,9 +76,8 @@ export default function HomePage() {
     if (!confirm('确定要删除这个食材吗？')) {
       return;
     }
-    const userId = localStorage.getItem('user_id') || '00000000-0000-0000-0000-000000000000';
     try {
-      await ingredientApi.deleteIngredient(ingredientId, userId);
+      await ingredientApi.deleteIngredient(ingredientId, getUserId());
       removeIngredient(ingredientId);
       setShowRecipeRefreshDialog(true);
     } catch (err) {

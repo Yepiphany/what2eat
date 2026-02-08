@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useUserStore, useIngredientsStore, useRecipesStore } from '../stores';
 import { userApi } from '../services/api';
+import { getUserId } from '../utils/userId';
 import type { TastePreference, DietType } from '../types';
 
 const tasteOptions: { value: TastePreference; label: string; emoji: string; color: string }[] = [
@@ -98,7 +99,7 @@ export default function ProfilePage() {
         if (activeSetting === 'diet') payload.diet_type = selectedDiet || undefined;
         if (activeSetting === 'time') payload.max_cooking_time = maxCookingTime;
         if (activeSetting === 'level') payload.cooking_level = selectedLevel || undefined;
-        const updatedUser = await userApi.updatePreferences(currentUser.id, payload);
+        const updatedUser = await userApi.updatePreferences(getUserId(), payload);
         setUser(updatedUser);
         if (activeSetting === 'taste') updatePreferences({ tastePreferences: selectedTastes });
         if (activeSetting === 'diet') updatePreferences({ dietType: selectedDiet || null });
@@ -161,8 +162,9 @@ export default function ProfilePage() {
         <p className="text-gray-500 mb-6">登录后可以享受个性化推荐和更多功能</p>
         <button
           onClick={() => {
+            const existingUserId = localStorage.getItem('user_id') || crypto.randomUUID();
             const demoUser = {
-              id: '00000000-0000-0000-0000-000000000000',
+              id: existingUserId,
               username: '美食爱好者',
               email: undefined,
               avatar_url: undefined,
@@ -173,10 +175,8 @@ export default function ProfilePage() {
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
             };
+            localStorage.setItem('user_id', existingUserId);
             setUser(demoUser);
-            try {
-              localStorage.setItem('user_id', demoUser.id);
-            } catch {}
           }}
           className="btn-primary"
         >

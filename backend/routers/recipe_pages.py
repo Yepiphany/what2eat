@@ -23,17 +23,15 @@ def hash_ingredients(ingredients: List[str]) -> str:
     return hashlib.md5(ingredients_str.encode()).hexdigest()
 
 @router.get("/")
-async def get_recipe_pages():
+async def get_recipe_pages(user_id: str):
     try:
         supabase = get_supabase_client()
         if supabase is None:
             return {"pages": [], "current_page": 0}
         
-        user_id = "00000000-0000-0000-0000-000000000000"
-        
         result = supabase.table("recipe_pages").select("*").eq("user_id", user_id).order("page_index").execute()
         
-        print(f"[DEBUG] 查询到 {len(result.data) if result.data else 0} 条记录")
+        print(f"[DEBUG] 查询到 {len(result.data) if result.data else 0} 条记录, user_id: {user_id[:8]}...")
         
         if result.data and len(result.data) > 0:
             page_indexes = [p['page_index'] for p in result.data]
@@ -55,21 +53,19 @@ async def get_recipe_pages():
         return {"pages": [], "current_page": 0}
 
 @router.post("/")
-async def save_recipe_page(page_data: Dict[str, Any]):
+async def save_recipe_page(user_id: str, page_data: Dict[str, Any]):
     try:
         supabase = get_supabase_client()
         if supabase is None:
             raise HTTPException(status_code=500, detail="Database connection failed")
         
-        user_id = "00000000-0000-0000-0000-000000000000"
         recipes = page_data.get("recipes", [])
         ingredients = page_data.get("ingredients", [])
         ingredients_hash = hash_ingredients(ingredients)
         
-        # 查询数据库中最大的 page_index
         result = supabase.table("recipe_pages").select("page_index").eq("user_id", user_id).order("page_index", desc=True).limit(1).execute()
         
-        print(f"[DEBUG] 查询数据库最大 page_index, 结果: {result.data}")
+        print(f"[DEBUG] 查询数据库最大 page_index, 结果: {result.data}, user_id: {user_id[:8]}...")
         
         if result.data and len(result.data) > 0:
             max_page_index = result.data[0]["page_index"]
@@ -98,13 +94,11 @@ async def save_recipe_page(page_data: Dict[str, Any]):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/")
-async def clear_recipe_pages():
+async def clear_recipe_pages(user_id: str):
     try:
         supabase = get_supabase_client()
         if supabase is None:
             raise HTTPException(status_code=500, detail="Database connection failed")
-        
-        user_id = "00000000-0000-0000-0000-000000000000"
         
         supabase.table("recipe_pages").delete().eq("user_id", user_id).execute()
         

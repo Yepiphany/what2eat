@@ -13,6 +13,24 @@ router = APIRouter()
 supabase = get_supabase_client()
 FALLBACK_INGREDIENTS: list = []
 
+def ensure_user_exists(user_id: str) -> bool:
+    """Check if user exists, if not create a placeholder user"""
+    try:
+        result = supabase.table("users").select("id").eq("id", user_id).execute()
+        if result.data:
+            return True
+        
+        supabase.table("users").insert({
+            "id": user_id,
+            "username": f"User_{user_id[:8]}",
+            "email": None
+        }).execute()
+        print(f"[INFO] Auto-created user record: {user_id[:8]}...")
+        return True
+    except Exception as e:
+        print(f"[WARN] Failed to ensure user exists: {e}")
+        return False
+
 @router.post("/scan", response_model=List[dict])
 async def scan_ingredients(image: UploadFile = File(...)):
     try:
@@ -42,6 +60,7 @@ async def scan_ingredients_base64(request: dict):
 @router.post("/", response_model=IngredientResponse)
 async def add_ingredient(ingredient: IngredientCreate, user_id: str):
     try:
+        ensure_user_exists(user_id)
         data = ingredient.model_dump()
         data["user_id"] = user_id
         
@@ -112,7 +131,7 @@ async def get_user_ingredients(user_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/{ingredient_id}")
-async def delete_ingredient(ingredient_id: str, user_id: str = Query(default="00000000-0000-0000-0000-000000000000")):
+async def delete_ingredient(ingredient_id: str, user_id: str):
     try:
         result = supabase.table("ingredients").delete().eq("id", ingredient_id).execute()
         
@@ -131,7 +150,7 @@ async def delete_ingredient(ingredient_id: str, user_id: str = Query(default="00
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/")
-async def clear_all_ingredients(user_id: str = Query(default="00000000-0000-0000-0000-000000000000")):
+async def clear_all_ingredients(user_id: str):
     try:
         result = supabase.table("ingredients").delete().eq("user_id", user_id).execute()
         

@@ -7,6 +7,7 @@ import type {
   RecipeRecommendationRequest,
   ShoppingList
 } from '../types';
+import { getUserId } from '../utils/userId';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -129,54 +130,54 @@ export const recipeApi = {
     return response.data;
   },
 
-  addToShoppingList: async (recipeId: string, items: string[], recipeTitle?: string): Promise<{ message: string; id: string }> => {
-    const response = await api.post('/shopping-list', {
-      recipe_id: recipeId,
-      items: items,
-      recipe_title: recipeTitle,
-    });
+  addToShoppingList: async (userId: string, data: { recipe_id: string; items: string[]; recipe_title?: string }): Promise<{ message: string; id: string }> => {
+    const response = await api.post('/shopping-list', data, { params: { user_id: userId } });
     return response.data;
   },
 
-  getShoppingLists: async (status?: string): Promise<ShoppingList[]> => {
-    const params = status ? { status } : {};
+  getShoppingLists: async (userId: string, status?: string): Promise<any[]> => {
+    const params: any = { user_id: userId };
+    if (status) params.status = status;
     const response = await api.get('/shopping-list', { params });
     return response.data;
   },
 
-  deleteShoppingListItem: async (itemId: string): Promise<{ message: string }> => {
-    const response = await api.delete(`/shopping-list/${itemId}`);
+  deleteShoppingListItem: async (userId: string, itemId: string): Promise<{ message: string }> => {
+    const response = await api.delete(`/shopping-list/${itemId}`, { params: { user_id: userId } });
     return response.data;
   },
 
-  toggleShoppingListItem: async (itemId: string, itemIndex: number): Promise<{ message: string; items: any[] }> => {
-    const response = await api.post(`/shopping-list/${itemId}/toggle-item`, null, {
-      params: { item_index: itemIndex },
-    });
+  toggleShoppingListItem: async (userId: string, itemId: string, itemIndex: number): Promise<any> => {
+    const response = await api.post(`/shopping-list/${itemId}/toggle-item`, null, { params: { user_id: userId, item_index: itemIndex } });
     return response.data;
   },
 
-  completeShoppingList: async (itemId: string): Promise<{ message: string }> => {
-    const response = await api.put(`/shopping-list/${itemId}/complete`);
+  completeShoppingList: async (userId: string, itemId: string): Promise<{ message: string }> => {
+    const response = await api.put(`/shopping-list/${itemId}/complete`, null, { params: { user_id: userId } });
     return response.data;
   },
 
-  getRecipePages: async (): Promise<{ pages: Recipe[][]; current_page: number }> => {
-    const response = await api.get('/recipe-pages/');
+  getRecipePages: async (userId: string): Promise<{ pages: Recipe[][]; current_page: number }> => {
+    const response = await api.get('/recipe-pages', { params: { user_id: userId } });
     return response.data;
   },
 
-  saveRecipePage: async (pageData: {
+  saveRecipePage: async (userId: string, pageData: {
     page_index: number;
     recipes: Recipe[];
     ingredients: string[];
   }): Promise<{ message: string; page_index: number }> => {
-    const response = await api.post('/recipe-pages/', pageData);
+    const response = await api.post('/recipe-pages', pageData, { params: { user_id: userId } });
     return response.data;
   },
 
-  clearRecipePages: async (): Promise<{ message: string }> => {
-    const response = await api.delete('/recipe-pages/');
+  clearRecipePages: async (userId: string): Promise<{ message: string }> => {
+    const response = await api.delete('/recipe-pages', { params: { user_id: userId } });
+    return response.data;
+  },
+
+  clearShoppingList: async (userId: string): Promise<{ message: string }> => {
+    const response = await api.delete('/shopping-list', { params: { user_id: userId } });
     return response.data;
   },
 };
@@ -264,7 +265,7 @@ export const userApi = {
     }
   ): Promise<User> => {
     const validUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    const uid = validUuid.test(userId) ? userId : '00000000-0000-0000-0000-000000000000';
+    const uid = validUuid.test(userId) ? userId : getUserId();
     const response = await api.put(`/users/${uid}/preferences`, null, { params: preferences });
     return response.data;
   },
