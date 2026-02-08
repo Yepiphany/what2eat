@@ -37,10 +37,26 @@ export default function ShoppingPage() {
   const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending');
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const [pendingCompleteItem, setPendingCompleteItem] = useState<ShoppingListItem | null>(null);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [completedCount, setCompletedCount] = useState(0);
 
   useEffect(() => {
     loadShoppingLists();
+    loadCounts();
   }, [activeTab]);
+
+  const loadCounts = async () => {
+    try {
+      const [pending, completed] = await Promise.all([
+        recipeApi.getShoppingLists('pending'),
+        recipeApi.getShoppingLists('completed')
+      ]);
+      setPendingCount(pending.length);
+      setCompletedCount(completed.length);
+    } catch (error) {
+      console.error('Failed to load counts:', error);
+    }
+  };
 
   const loadShoppingLists = async () => {
     setIsLoading(true);
@@ -58,6 +74,7 @@ export default function ShoppingPage() {
     try {
       await recipeApi.toggleShoppingListItem(itemId);
       loadShoppingLists();
+      loadCounts();
     } catch (error) {
       console.error('Failed to toggle item:', error);
     }
@@ -67,6 +84,7 @@ export default function ShoppingPage() {
     try {
       const response = await recipeApi.toggleShoppingListItem(itemId, itemIndex);
       await loadShoppingLists();
+      loadCounts();
       if (onComplete && response.items) {
         const allCompleted = response.items.every((ing: any) => {
           if (typeof ing === 'object' && ing !== null) {
@@ -101,6 +119,7 @@ export default function ShoppingPage() {
       try {
         await recipeApi.completeShoppingList(pendingCompleteItem.id);
         loadShoppingLists();
+        loadCounts();
       } catch (error) {
         console.error('Failed to complete shopping list:', error);
       }
@@ -115,13 +134,11 @@ export default function ShoppingPage() {
     try {
       await recipeApi.deleteShoppingListItem(itemId);
       loadShoppingLists();
+      loadCounts();
     } catch (error) {
       console.error('Failed to delete item:', error);
     }
   };
-
-  const pendingCount = shoppingLists.filter((item: any) => item.status === 'pending').length;
-  const completedCount = shoppingLists.filter((item: any) => item.status === 'completed').length;
 
   if (isLoading) {
     return (
@@ -133,15 +150,15 @@ export default function ShoppingPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <header className="flex items-center space-x-4">
+      <header className="text-center relative">
         <button
           onClick={() => navigate(-1)}
-          className="flex items-center space-x-2 text-gray-600 hover:text-gray-800"
+          className="absolute left-0 flex items-center space-x-2 text-gray-600 hover:text-gray-800"
         >
           <ChevronLeft size={24} />
           <span>返回</span>
         </button>
-        <h1 className="text-3xl font-bold text-gray-800">采购清单</h1>
+        <h1 className="text-3xl font-bold text-gray-800">🛒 采购清单</h1>
       </header>
 
       <div className="flex space-x-2">

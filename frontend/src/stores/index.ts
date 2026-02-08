@@ -72,88 +72,97 @@ interface RecipesStore {
   setError: (error: string | null) => void;
   clearRecommendations: () => Promise<void>;
   loadFromDatabase: () => Promise<void>;
+  getRecipePagesLength: () => number;
 }
 
-export const useRecipesStore = create<RecipesStore>()((set, get) => ({
-  recommendations: [],
-  recipePages: [],
-  currentPage: 0,
-  currentRecipe: null,
-  isLoading: false,
-  error: null,
-  
-  setRecommendations: (recipes) => set({ recommendations: recipes }),
-  
-  setRecipePages: (pages) => set({ recipePages: pages }),
-  
-  getRecipePagesLength: () => get().recipePages.length,
-  
-  addRecipePage: async (page, ingredients: string[]) => {
-    const state = get();
-    const newPages = [...state.recipePages, page];
-    console.log('[DEBUG] addRecipePage - 前端状态更新:', newPages.length, '页');
-    set({ recipePages: newPages, currentPage: newPages.length - 1 });
+export const useRecipesStore = create<RecipesStore>()(
+  persist(
+    (set, get) => ({
+      recommendations: [],
+      recipePages: [],
+      currentPage: 0,
+      currentRecipe: null,
+      isLoading: false,
+      error: null,
+      
+      setRecommendations: (recipes) => set({ recommendations: recipes }),
+      
+      setRecipePages: (pages) => set({ recipePages: pages }),
+      
+      getRecipePagesLength: () => get().recipePages.length,
+      
+      addRecipePage: async (page, ingredients: string[]) => {
+        const state = get();
+        const newPages = [...state.recipePages, page];
+        console.log('[DEBUG] addRecipePage - 前端状态更新:', newPages.length, '页');
+        set({ recipePages: newPages, currentPage: newPages.length - 1 });
 
-    try {
-      const { recipeApi } = await import('../services/api');
-      // 后端会忽略 page_index，自动计算正确的值
-      const response = await recipeApi.saveRecipePage({
-        page_index: newPages.length - 1,
-        recipes: page,
-        ingredients,
-      });
-      console.log('[DEBUG] 第', response.page_index + 1, '页保存成功 (后端分配的page_index:', response.page_index, ')');
-    } catch (e) {
-      console.error('Failed to save recipe page:', e);
+        try {
+          const { recipeApi } = await import('../services/api');
+          const response = await recipeApi.saveRecipePage({
+            page_index: newPages.length - 1,
+            recipes: page,
+            ingredients,
+          });
+          console.log('[DEBUG] 第', response.page_index + 1, '页保存成功 (后端分配的page_index:', response.page_index, ')');
+        } catch (e) {
+          console.error('Failed to save recipe page:', e);
+        }
+      },
+      
+      setCurrentPage: (page) => set({ currentPage: page }),
+      
+      setCurrentRecipe: (recipe) => set({ currentRecipe: recipe }),
+      
+      addRecommendations: (recipes) =>
+        set((state) => ({
+          recommendations: [...state.recommendations, ...recipes],
+        })),
+      
+      setLoading: (loading) => set({ isLoading: loading }),
+      
+      setError: (error) => set({ error }),
+      
+      clearRecommendations: async () => {
+        set({ recommendations: [], recipePages: [], currentPage: 0, currentRecipe: null });
+        
+        try {
+          const { recipeApi } = await import('../services/api');
+          await recipeApi.clearRecipePages();
+        } catch (e) {
+          console.error('Failed to clear recipe pages:', e);
+        }
+      },
+      
+      loadFromDatabase: async () => {
+        try {
+          console.log('[DEBUG] loadFromDatabase 开始...');
+          const { recipeApi } = await import('../services/api');
+          const data = await recipeApi.getRecipePages();
+          console.log('[DEBUG] loadFromDatabase 返回:', data);
+          const pages = data.pages || [];
+          const state = get();
+          const currentPg = state.currentPage;
+          const validPage = pages.length > 0 ? Math.min(currentPg, pages.length - 1) : 0;
+          set({
+            recipePages: pages,
+            currentPage: validPage,
+            recommendations: pages[validPage] || [],
+          });
+          console.log('[DEBUG] store 更新后:', get().recipePages.length, '页');
+          return pages.length;
+        } catch (e) {
+          console.error('Failed to load recipe pages from database:', e);
+          return 0;
+        }
+      },
+    }),
+    {
+      name: 'recipes-storage',
+      partialize: (state) => ({ currentPage: state.currentPage }),
     }
-  },
-  
-  setCurrentPage: (page) => set({ currentPage: page }),
-  
-  setCurrentRecipe: (recipe) => set({ currentRecipe: recipe }),
-  
-  addRecommendations: (recipes) =>
-    set((state) => ({
-      recommendations: [...state.recommendations, ...recipes],
-    })),
-  
-  setLoading: (loading) => set({ isLoading: loading }),
-  
-  setError: (error) => set({ error }),
-  
-  clearRecommendations: async () => {
-    set({ recommendations: [], recipePages: [], currentPage: 0, currentRecipe: null });
-    
-    try {
-      const { recipeApi } = await import('../services/api');
-      await recipeApi.clearRecipePages();
-    } catch (e) {
-      console.error('Failed to clear recipe pages:', e);
-    }
-  },
-  
-  loadFromDatabase: async () => {
-    try {
-      console.log('[DEBUG] loadFromDatabase 开始...');
-      const { recipeApi } = await import('../services/api');
-      const data = await recipeApi.getRecipePages();
-      console.log('[DEBUG] loadFromDatabase 返回:', data);
-      const pages = data.pages || [];
-      // 刷新页面后显示最新的菜谱（最后一页）
-      const lastPageIndex = pages.length > 0 ? pages.length - 1 : 0;
-      set({
-        recipePages: pages,
-        currentPage: lastPageIndex,
-        recommendations: pages[lastPageIndex] || [],
-      });
-      console.log('[DEBUG] store 更新后:', get().recipePages.length, '页');
-      return pages.length; // 返回加载的页面数量
-    } catch (e) {
-      console.error('Failed to load recipe pages from database:', e);
-      return 0;
-    }
-  },
-}));
+  )
+);
 
 interface CookingStore {
   currentSession: CookingSession | null;

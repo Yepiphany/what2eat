@@ -48,7 +48,7 @@ export interface Recipe {
 
 export type RecipeDifficulty = 'easy' | 'medium' | 'hard';
 export type TastePreference = 'spicy' | 'sweet' | 'sour' | 'salty' | 'umami' | 'mild' | 'bitter';
-export type DietType = 'normal' | 'keto' | 'low_carb' | 'low_fat' | 'vegetarian' | 'vegan' | 'paleo';
+export type DietType = 'balanced' | 'meat_lover' | 'vegetable_lover' | 'low_carb';
 
 export interface CookingStep {
   step_number: number;
@@ -91,6 +91,7 @@ export interface RecipeRecommendationRequest {
   diet_type?: DietType;
   max_cooking_time?: number;
   max_difficulty?: RecipeDifficulty;
+  cooking_level?: string;
 }
 
 export interface VoiceCommand {

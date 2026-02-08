@@ -30,8 +30,43 @@ const tasteEmojis: Record<string, string> = {
   sour: '🍋',
   salty: '🧂',
   umami: '🍖',
+  savory: '🍖',
   mild: '🥬',
   bitter: '☕',
+  辣: '🌶️',
+  甜: '🍬',
+  酸: '🍋',
+  咸: '🧂',
+  鲜: '🍖',
+  清淡: '🥬',
+  苦: '☕',
+};
+
+const tasteLabels: Record<string, string> = {
+  spicy: '辣',
+  sweet: '甜',
+  sour: '酸',
+  salty: '咸',
+  umami: '鲜',
+  savory: '鲜',
+  mild: '清淡',
+  bitter: '苦',
+  辣: '辣',
+  甜: '甜',
+  酸: '酸',
+  咸: '咸',
+  鲜: '鲜',
+  清淡: '清淡',
+  苦: '苦',
+};
+
+const dietLabels: Record<string, string> = {
+  balanced: '均衡饮食',
+  meat_lover: '爱吃肉',
+  vegetable_lover: '爱吃菜',
+  low_carb: '低碳水',
+  vegetarian: '爱吃菜',
+  normal: '均衡饮食',
 };
 
 export default function RecipeDetailPage() {
@@ -171,7 +206,7 @@ export default function RecipeDetailPage() {
                   </button>
                 </div>
 
-                {recipe.match_percentage && recipe.match_percentage > 0 && (
+                {recipe.match_percentage !== undefined && recipe.match_percentage !== null && (
                   <div className="bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 flex items-center space-x-2">
                     <ChefHat size={20} className="text-primary-600" />
                     <span className="font-medium text-primary-600">
@@ -219,7 +254,7 @@ export default function RecipeDetailPage() {
                     key={tag}
                     className="px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-sm font-medium"
                   >
-                    {tasteEmojis[tag]} {tag}
+                    {tasteEmojis[tag]} {tasteLabels[tag] || tag}
                   </span>
                 ))}
               </div>
@@ -387,16 +422,16 @@ export default function RecipeDetailPage() {
                 </ul>
               </div>
 
-              {recipe.diet_types && recipe.diet_types.length > 0 && (
+              {recipe.diet_types && recipe.diet_types.filter(type => dietLabels[type]).length > 0 && (
                 <div className="border-t pt-4">
                   <h3 className="font-semibold text-gray-800 mb-3">适合饮食类型</h3>
                   <div className="flex flex-wrap gap-2">
-                    {recipe.diet_types.map(type => (
+                    {recipe.diet_types.filter(type => dietLabels[type]).map(type => (
                       <span
                         key={type}
                         className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
                       >
-                        {type}
+                        {dietLabels[type]}
                       </span>
                     ))}
                   </div>

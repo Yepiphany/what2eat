@@ -13,13 +13,10 @@ class TastePreference(str, Enum):
     BITTER = "bitter"
 
 class DietType(str, Enum):
-    NORMAL = "normal"
-    KETO = "keto"
+    BALANCED = "balanced"
+    MEAT_LOVER = "meat_lover"
+    VEGETABLE_LOVER = "vegetable_lover"
     LOW_CARB = "low_carb"
-    LOW_FAT = "low_fat"
-    VEGETARIAN = "vegetarian"
-    VEGAN = "vegan"
-    PALEO = "paleo"
 
 class CookingTime(str, Enum):
     QUICK = "quick"  # < 15 mins

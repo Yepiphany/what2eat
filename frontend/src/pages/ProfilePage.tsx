@@ -32,10 +32,10 @@ const tasteOptions: { value: TastePreference; label: string; emoji: string; colo
 ];
 
 const dietOptions: { value: DietType; label: string; description: string }[] = [
-  { value: 'normal', label: '普通饮食', description: '均衡饮食' },
-  { value: 'vegetarian', label: '素食', description: '不吃肉类，可吃蛋奶' },
-  { value: 'vegan', label: '纯素', description: '不吃任何动物制品' },
-  { value: 'low_carb', label: '低碳水', description: '减少碳水摄入' },
+  { value: 'balanced', label: '均衡饮食', description: '荤素搭配，营养均衡' },
+  { value: 'meat_lover', label: '爱吃肉', description: '偏好肉类菜品，无肉不欢' },
+  { value: 'vegetable_lover', label: '爱吃菜', description: '偏好蔬菜菜品，清淡健康' },
+  { value: 'low_carb', label: '低碳水', description: '减少碳水摄入，控制热量' },
 ];
 
 export default function ProfilePage() {
@@ -226,7 +226,11 @@ export default function ProfilePage() {
                 className="p-4 bg-primary-50 rounded-xl text-center hover:bg-primary-100 transition-colors"
               >
                 <div className="text-2xl mb-1">🍽️</div>
-                <div className="text-lg font-bold text-primary-600">{selectedTastes.length}</div>
+                <div className="text-lg font-bold text-primary-600">
+                  {selectedTastes.length > 0 
+                    ? selectedTastes.map(t => tasteOptions.find(o => o.value === t)?.label).join('、')
+                    : '未设置'}
+                </div>
                 <div className="text-sm text-gray-500">口味偏好</div>
               </button>
               
@@ -246,8 +250,8 @@ export default function ProfilePage() {
                 className="p-4 bg-purple-50 rounded-xl text-center hover:bg-purple-100 transition-colors"
               >
                 <div className="text-2xl mb-1">⏱️</div>
-                <div className="text-lg font-bold text-purple-600">{maxCookingTime}</div>
-                <div className="text-sm text-gray-500">最大时间(分)</div>
+                <div className="text-lg font-bold text-purple-600">{maxCookingTime}分钟</div>
+                <div className="text-sm text-gray-500">最大烹饪时间</div>
               </button>
               
               <button

@@ -51,6 +51,9 @@ export default function ScannerPage() {
   };
 
   const handleDeleteIngredient = async (ingredientId: string) => {
+    if (!confirm('确定要删除这个食材吗？')) {
+      return;
+    }
     const userId = localStorage.getItem('user_id') || '00000000-0000-0000-0000-000000000000';
     try {
       await ingredientApi.deleteIngredient(ingredientId, userId);

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Filter, Clock, X, RefreshCw, Trash2 } from 'lucide-react';
-import { useIngredientsStore, useRecipesStore } from '../stores';
+import { useIngredientsStore, useRecipesStore, useUserStore } from '../stores';
 import { recipeApi } from '../services/api';
 import type { Recipe, DietType, TastePreference } from '../types';
 
@@ -14,12 +14,14 @@ const difficultyOptions = [
 export default function RecipesPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [showExcludeModal, setShowExcludeModal] = useState(false);
+  const [showApiLimitDialog, setShowApiLimitDialog] = useState(false);
   const [hasInitialLoad, setHasInitialLoad] = useState(false);
   const [isLoadingFromDb, setIsLoadingFromDb] = useState(false);
   const [isFirstTimeLoading, setIsFirstTimeLoading] = useState(true);
 
   const { ingredients } = useIngredientsStore();
   const { recipePages, currentPage, setRecipePages, addRecipePage, setCurrentPage, recommendations, setRecommendations, loadFromDatabase, clearRecommendations, getRecipePagesLength } = useRecipesStore();
+  const { currentUser, preferences } = useUserStore();
 
   const availableIngredientNames = useMemo(() =>
     ingredients.map(ing => ing.name)
@@ -48,11 +50,23 @@ export default function RecipesPage() {
       const request = {
         available_ingredients: filteredIngredients,
         force_refresh: forceRefresh,
+        taste_preferences: preferences.tastePreferences as TastePreference[],
+        diet_type: preferences.dietType as DietType,
+        max_cooking_time: preferences.maxCookingTime || undefined,
+        cooking_level: preferences.cookingLevel || undefined,
       };
       
       console.log('[DEBUG] 调用 API 获取菜谱...');
       const recipes = await recipeApi.getRecommendations(request);
       console.log('[DEBUG] API 返回', recipes.length, '道菜谱');
+      
+      // 检查是否 API 返回空结果（可能达到限额）
+      if (recipes.length === 0) {
+        // 无论是否有已有菜谱，都弹出对话框
+        setShowApiLimitDialog(true);
+        setIsFirstTimeLoading(false);
+        return;
+      }
       
       if (forceRefresh) {
         console.log('[DEBUG] 强制刷新，添加新页面');
@@ -76,19 +90,15 @@ export default function RecipesPage() {
       setIsFirstTimeLoading(false);
     } catch (error) {
       console.error('Failed to fetch recipes:', error);
-      setRecipePages(currentPages => {
-        if (currentPages.length === 0) {
-          setRecommendations([]);
-        }
-        return currentPages;
-      });
+      // 无论是否有已有菜谱，都弹出对话框
+      setShowApiLimitDialog(true);
       // 即使出错也设置 isFirstTimeLoading 为 false，避免无限加载
       setIsFirstTimeLoading(false);
     } finally {
       setIsLoading(false);
       isFetchingRef.current = false;
     }
-  }, [availableIngredientNames, setRecommendations, addRecipePage, setCurrentPage, setRecipePages]);
+  }, [availableIngredientNames, setRecommendations, addRecipePage, setCurrentPage, setRecipePages, getRecipePagesLength]);
 
   // 加载数据库数据 - 只在组件挂载和食材变化时执行
   useEffect(() => {
@@ -373,6 +383,48 @@ export default function RecipesPage() {
               >
                 重新推荐
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showApiLimitDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-3xl">⚠️</span>
+              </div>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">获取菜谱失败</h3>
+              <p className="text-gray-500">
+                很抱歉，您已达今日推荐限额，暂时无法获取新菜谱。
+                {recipePages.length > 0 && (
+                  <>
+                    <br />
+                    您已有 {recipePages.length} 页菜谱可以浏览。
+                  </>
+                )}
+              </p>
+            </div>
+            
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setShowApiLimitDialog(false)}
+                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+              >
+                关闭
+              </button>
+              {recipePages.length > 0 && (
+                <button
+                  onClick={() => {
+                    setShowApiLimitDialog(false);
+                    setCurrentPage(0);
+                  }}
+                  className="flex-1 px-4 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors"
+                >
+                  查看已有菜谱
+                </button>
+              )}
             </div>
           </div>
         </div>

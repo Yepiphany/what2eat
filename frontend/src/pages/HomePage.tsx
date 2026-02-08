@@ -7,12 +7,11 @@ import type { Ingredient } from '../types';
 
 export default function HomePage() {
   const { ingredients, addIngredient, setIngredients, removeIngredient } = useIngredientsStore();
-  const { recommendations, setRecommendations, recipePages } = useRecipesStore();
+  const { recommendations, recipePages, loadFromDatabase } = useRecipesStore();
   const [showAddForm, setShowAddForm] = useState(false);
   const [newIngredient, setNewIngredient] = useState({ name: '', quantity: 1, unit: '个', category: 'other' });
   const [isAdding, setIsAdding] = useState(false);
   const [shoppingLists, setShoppingLists] = useState<any[]>([]);
-  const [isLoadingRecipes, setIsLoadingRecipes] = useState(false);
   const [showRecipeRefreshDialog, setShowRecipeRefreshDialog] = useState(false);
 
   const expiringSoon = ingredients.filter(ing => ing.is_expiring_soon);
@@ -20,29 +19,11 @@ export default function HomePage() {
 
   useEffect(() => {
     loadShoppingLists();
+    // 如果 recipePages 为空，从数据库加载
+    if (recipePages.length === 0) {
+      loadFromDatabase();
+    }
   }, []);
-
-  useEffect(() => {
-    if (hasIngredients && recommendations.length === 0 && !isLoadingRecipes) {
-      loadRecommendations();
-    }
-  }, [hasIngredients, recommendations.length]);
-
-  const loadRecommendations = async () => {
-    setIsLoadingRecipes(true);
-    try {
-      const request = {
-        available_ingredients: ingredients.map(ing => ing.name),
-        force_refresh: false,
-      };
-      const recipes = await recipeApi.getRecommendations(request);
-      setRecommendations(recipes);
-    } catch (error) {
-      console.error('Failed to load recommendations:', error);
-    } finally {
-      setIsLoadingRecipes(false);
-    }
-  };
 
   const loadShoppingLists = async () => {
     try {
@@ -91,6 +72,9 @@ export default function HomePage() {
   };
 
   const handleDeleteIngredient = async (ingredientId: string) => {
+    if (!confirm('确定要删除这个食材吗？')) {
+      return;
+    }
     const userId = localStorage.getItem('user_id') || '00000000-0000-0000-0000-000000000000';
     try {
       await ingredientApi.deleteIngredient(ingredientId, userId);
@@ -288,53 +272,53 @@ export default function HomePage() {
             ))}
           </div>
 
-          {recommendations.length > 0 && (
-            <section className="mt-8">
-              <Link to="/shopping" className="flex items-center justify-between group">
-                <h2 className="text-xl font-semibold text-gray-800 group-hover:text-primary-600 transition-colors">我的采购清单</h2>
-                <span className="text-primary-600 text-sm opacity-0 group-hover:opacity-100 transition-opacity">进入 →</span>
-              </Link>
-              
-              {shoppingLists.length > 0 ? (
-                <div className="space-y-4 mt-4">
-                  {shoppingLists.slice(0, 3).map((list) => (
-                    <div key={list.id} className="p-4 bg-orange-50 rounded-lg">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <ShoppingCart size={16} className="text-orange-600" />
-                        <Link
-                          to={`/recipes/${list.recipe_id}`}
-                          className="font-medium text-gray-800 hover:text-primary-600"
-                        >
-                          {list.recipe_title || '未知菜谱'}
-                        </Link>
-                      </div>
-                      <div className="space-y-1">
-                        {list.items.slice(0, 3).map((item: any, idx: number) => (
-                          <div key={idx} className="flex items-center space-x-2 text-sm">
-                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                              getItemCompleted(item)
-                                ? 'bg-green-500 border-green-500'
-                                : 'border-orange-300'
-                            }`}>
-                              {getItemCompleted(item) && <Check size={10} className="text-white" />}
-                            </div>
-                            <span className={getItemCompleted(item) ? 'text-gray-400 line-through' : 'text-gray-700'}>
-                              {getItemName(item)}
-                            </span>
-                          </div>
-                        ))}
-                        {list.items.length > 3 && (
-                          <p className="text-xs text-gray-500">等 {list.items.length} 项</p>
-                        )}
-                      </div>
+          <section className="mt-8">
+            <Link to="/shopping" className="flex items-center justify-between group">
+              <h2 className="text-xl font-semibold text-gray-800 group-hover:text-primary-600 transition-colors">我的采购清单</h2>
+              <span className="text-primary-600 text-sm opacity-0 group-hover:opacity-100 transition-opacity">进入 →</span>
+            </Link>
+            
+            {shoppingLists.length > 0 ? (
+              <div className="space-y-4 mt-4">
+                {shoppingLists.slice(0, 3).map((list) => (
+                  <div key={list.id} className="p-4 bg-orange-50 rounded-lg">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <ShoppingCart size={16} className="text-orange-600" />
+                      <Link
+                        to={`/recipes/${list.recipe_id}`}
+                        className="font-medium text-gray-800 hover:text-primary-600"
+                      >
+                        {list.recipe_title || '未知菜谱'}
+                      </Link>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-gray-500 text-sm mt-4">暂无待采购的食材</p>
-              )}
-            </section>
-          )}
+                    <div className="flex flex-wrap gap-2">
+                      {list.items.map((item: any, idx: number) => (
+                        <span
+                          key={idx}
+                          className={`inline-flex items-center space-x-1 text-sm px-2 py-1 rounded-full ${
+                            getItemCompleted(item)
+                              ? 'bg-green-100 text-gray-400 line-through'
+                              : 'bg-orange-100 text-gray-700'
+                          }`}
+                        >
+                          <div className={`w-3 h-3 rounded-full border flex items-center justify-center ${
+                            getItemCompleted(item)
+                              ? 'bg-green-500 border-green-500'
+                              : 'border-orange-300'
+                          }`}>
+                            {getItemCompleted(item) && <Check size={8} className="text-white" />}
+                          </div>
+                          <span>{getItemName(item)}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500 text-sm mt-4">暂无待采购的食材</p>
+            )}
+          </section>
         </section>
       )}
 

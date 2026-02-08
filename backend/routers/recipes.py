@@ -12,20 +12,40 @@ async def get_recipe_recommendations(request: Request):
     data = await request.json()
     available_ingredients = data.get('available_ingredients', [])
     taste_preferences = data.get('taste_preferences', [])
-    diet_type = data.get('diet_type', None)
+    diet_type_str = data.get('diet_type', None)
     force_refresh = data.get('force_refresh', False)
+    max_cooking_time = data.get('max_cooking_time', None)
+    cooking_level = data.get('cooking_level', None)
     
     if not available_ingredients:
         return []
+    
+    # 转换 diet_type 为枚举
+    diet_type = None
+    if diet_type_str:
+        try:
+            diet_type = DietType(diet_type_str)
+        except ValueError:
+            print(f"Invalid diet_type: {diet_type_str}")
+    
+    # 转换 taste_preferences 为枚举列表
+    taste_prefs = []
+    for t in taste_preferences:
+        try:
+            taste_prefs.append(TastePreference(t))
+        except ValueError:
+            print(f"Invalid taste preference: {t}")
     
     from services.recipe_service import get_ai_batch_recipes
     
     recipes = await get_ai_batch_recipes(
         available_ingredients=available_ingredients,
-        taste_preferences=taste_preferences,
+        taste_preferences=taste_prefs,
         diet_type=diet_type,
         count=10,
-        force_refresh=force_refresh
+        force_refresh=force_refresh,
+        max_cooking_time=max_cooking_time,
+        cooking_level=cooking_level
     )
     return recipes
 

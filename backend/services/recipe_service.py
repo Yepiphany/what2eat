@@ -15,7 +15,7 @@ load_dotenv()
 # 新的 ModelScope API 配置
 MODELSCOPE_BASE_URL = "https://api-inference.modelscope.cn/v1"
 MODELSCOPE_API_KEY = "ms-76b46a1c-253d-45c0-bccd-e91b31bbc460"
-MODELSCOPE_VISION_MODEL = "deepseek-ai/DeepSeek-V3.2"
+MODELSCOPE_VISION_MODEL = "ZhipuAI/GLM-4.7-Flash"
 
 CACHE_DURATION_HOURS = int(os.getenv("RECIPE_CACHE_HOURS", "24"))
 _RECIPES_MEMORY: dict = {}
@@ -33,10 +33,30 @@ def generate_ingredients_hash(ingredients: List[str], taste_preferences: Optiona
     return hashlib.md5(key_str.encode()).hexdigest()
 
 def enhance_recipe_with_matching(recipe: Dict, available_ingredients: List[str]) -> Dict:
-    available_set = set(available_ingredients)
-    recipe_ingredients = set(recipe.get("ingredients", []))
-    matched = list(recipe_ingredients & available_set)
-    missing = list(recipe_ingredients - available_set)
+    available_lower = [i.lower().strip() for i in available_ingredients]
+    recipe_ingredients = recipe.get("ingredients", [])
+    recipe_ingredients_lower = [i.lower().strip() for i in recipe_ingredients]
+    
+    matched = []
+    missing = []
+    
+    for i, ing in enumerate(recipe_ingredients):
+        ing_lower = recipe_ingredients_lower[i]
+        is_matched = False
+        
+        for avail in available_lower:
+            if avail == ing_lower:
+                is_matched = True
+                break
+            if avail in ing_lower or ing_lower in avail:
+                is_matched = True
+                break
+        
+        if is_matched:
+            matched.append(ing)
+        else:
+            missing.append(ing)
+    
     match_percentage = round(len(matched) / len(recipe_ingredients) * 100, 1) if recipe_ingredients else 0
     
     recipe["matched_ingredients"] = matched
@@ -146,7 +166,9 @@ async def get_ai_batch_recipes(
     taste_preferences: Optional[List[TastePreference]] = None,
     diet_type: Optional[DietType] = None,
     count: int = 3,
-    force_refresh: bool = False
+    force_refresh: bool = False,
+    max_cooking_time: Optional[int] = None,
+    cooking_level: Optional[str] = None
 ) -> List[Dict]:
     if not available_ingredients:
         return []
@@ -166,8 +188,49 @@ async def get_ai_batch_recipes(
     
     try:
         taste_str = ", ".join([t.value for t in taste_preferences]) if taste_preferences else "任意"
-        diet_str = diet_type.value if diet_type else "任意"
+        
+        # 根据饮食类型生成不同的提示
+        diet_descriptions = {
+            "balanced": "均衡饮食（荤素搭配，营养均衡）",
+            "meat_lover": "爱吃肉（偏好肉类菜品，多推荐荤菜）",
+            "vegetable_lover": "爱吃菜（偏好蔬菜菜品，多推荐素菜）",
+            "low_carb": "低碳水（减少米饭、面条等主食，多用蔬菜和肉类）"
+        }
+        diet_str = diet_descriptions.get(diet_type.value if diet_type else "balanced", "均衡饮食")
         ingredients_str = ", ".join(available_ingredients)
+        
+        # 烹饪水平描述
+        level_descriptions = {
+            "beginner": "初级（简单易做，步骤少，技巧要求低）",
+            "intermediate": "中级（中等难度，需要一定烹饪技巧）",
+            "advanced": "高级（复杂菜品，需要较高烹饪技巧）"
+        }
+        level_str = level_descriptions.get(cooking_level, "任意水平")
+        
+        # 时间限制
+        time_str = f"{max_cooking_time}分钟以内" if max_cooking_time else "不限"
+        
+        # 根据饮食类型调整菜谱结构
+        if diet_type and diet_type.value == "meat_lover":
+            category_instruction = """请直接返回5道菜（四菜一汤），包含：
+- 3道荤菜（必须包含肉类/海鲜）
+- 1道素菜（纯蔬菜/豆制品）
+- 1道汤品（可以是肉汤或素汤）"""
+        elif diet_type and diet_type.value == "vegetable_lover":
+            category_instruction = """请直接返回5道菜（四菜一汤），包含：
+- 1道荤菜（包含肉类/海鲜）
+- 3道素菜（纯蔬菜/豆制品，不能含肉类）
+- 1道素汤"""
+        elif diet_type and diet_type.value == "low_carb":
+            category_instruction = """请直接返回5道菜（四菜一汤），低碳水饮食：
+- 2道荤菜（必须包含肉类/海鲜，不使用淀粉勾芡）
+- 2道素菜（纯蔬菜，避免土豆、红薯等高碳水蔬菜）
+- 1道汤品（清汤为主，不加淀粉）"""
+        else:
+            category_instruction = """请直接返回5道菜（四菜一汤），包含：
+- 2道荤菜（必须包含肉类/海鲜，如：猪肉、牛肉、鸡肉、鱼虾等，禁止用蛋类冒充荤菜）
+- 2道素菜（纯蔬菜/豆制品，不能含肉类）
+- 1道汤品"""
         
         client = OpenAI(
             base_url=MODELSCOPE_BASE_URL,
@@ -183,17 +246,18 @@ async def get_ai_batch_recipes(
 
 现有食材: {ingredients_str}
 口味偏好: {taste_str}
-饮食限制: {diet_str}
+饮食偏好: {diet_str}
+烹饪水平: {level_str}
+最大烹饪时间: {time_str}
 
-请直接返回5道菜（四菜一汤），包含：
-- 2道荤菜（必须包含肉类/海鲜，如：猪肉、牛肉、鸡肉、鱼虾等，禁止用蛋类冒充荤菜）
-- 2道素菜（纯蔬菜/豆制品，不能含肉类）
-- 1道汤品
+{category_instruction}
 
 **重要规则**：
 1. 荤菜必须包含真实肉类（猪肉、牛肉、鸡肉、鱼、虾等），禁止使用蛋类作为荤菜
-2. 如果用户没有肉类食材，仍然必须推荐2道需要肉类的荤菜，将缺少的肉类放到missing_ingredients中
+2. 如果用户没有肉类食材，仍然必须推荐需要肉类的荤菜，将缺少的肉类放到missing_ingredients中
 3. 素菜禁止包含任何肉类食材
+4. 根据用户的饮食偏好调整菜谱结构
+5. taste_tags 必须使用中文，可选值：辣、甜、酸、咸、鲜、清淡、苦
 
 严格按照JSON数组格式返回：
 
@@ -206,14 +270,12 @@ async def get_ai_batch_recipes(
         "steps": ["步骤1", "步骤2"],
         "cooking_time": 15-30,
         "difficulty": "easy/medium/hard",
-        "taste_tags": ["口味1"],
-        "diet_types": ["normal"],
+        "taste_tags": ["辣"],
+        "diet_types": ["balanced"],
         "calories": 200-500,
         "servings": 2-4
     }}
-]
-
-注意：严格确保包含2个meat、2个veg、1个soup。meat类别必须包含真实肉类，禁止蛋类。"""
+]"""
 
                 },
                 {
@@ -270,7 +332,76 @@ async def get_ai_batch_recipes(
                         else:
                             meat_recipes.append(recipe)
                 
-                all_recipes = meat_recipes[:2] + veg_recipes[:2] + soup_recipes[:1]
+                # 根据饮食类型调整菜谱结构，确保总是返回5道菜
+                if diet_type and diet_type.value == "meat_lover":
+                    # 爱吃肉: 3荤1素1汤
+                    selected_meat = meat_recipes[:3]
+                    selected_veg = veg_recipes[:1]
+                    selected_soup = soup_recipes[:1]
+                    # 如果不足5道，从其他类型补充
+                    total = len(selected_meat) + len(selected_veg) + len(selected_soup)
+                    if total < 5:
+                        needed = 5 - total
+                        # 先从素菜补充
+                        extra_veg = veg_recipes[1:1+needed]
+                        selected_veg.extend(extra_veg)
+                        needed -= len(extra_veg)
+                        # 再从荤菜补充
+                        if needed > 0:
+                            extra_meat = meat_recipes[3:3+needed]
+                            selected_meat.extend(extra_meat)
+                            needed -= len(extra_meat)
+                        # 最后从汤补充
+                        if needed > 0:
+                            extra_soup = soup_recipes[1:1+needed]
+                            selected_soup.extend(extra_soup)
+                    all_recipes = selected_meat + selected_veg + selected_soup
+                elif diet_type and diet_type.value == "vegetable_lover":
+                    # 爱吃菜: 1荤3素1汤
+                    selected_meat = meat_recipes[:1]
+                    selected_veg = veg_recipes[:3]
+                    selected_soup = soup_recipes[:1]
+                    # 如果不足5道，从其他类型补充
+                    total = len(selected_meat) + len(selected_veg) + len(selected_soup)
+                    if total < 5:
+                        needed = 5 - total
+                        # 先从荤菜补充
+                        extra_meat = meat_recipes[1:1+needed]
+                        selected_meat.extend(extra_meat)
+                        needed -= len(extra_meat)
+                        # 再从素菜补充
+                        if needed > 0:
+                            extra_veg = veg_recipes[3:3+needed]
+                            selected_veg.extend(extra_veg)
+                            needed -= len(extra_veg)
+                        # 最后从汤补充
+                        if needed > 0:
+                            extra_soup = soup_recipes[1:1+needed]
+                            selected_soup.extend(extra_soup)
+                    all_recipes = selected_meat + selected_veg + selected_soup
+                else:
+                    # 均衡饮食和低碳水: 2荤2素1汤
+                    selected_meat = meat_recipes[:2]
+                    selected_veg = veg_recipes[:2]
+                    selected_soup = soup_recipes[:1]
+                    # 如果不足5道，从其他类型补充
+                    total = len(selected_meat) + len(selected_veg) + len(selected_soup)
+                    if total < 5:
+                        needed = 5 - total
+                        # 先从荤菜补充
+                        extra_meat = meat_recipes[2:2+needed]
+                        selected_meat.extend(extra_meat)
+                        needed -= len(extra_meat)
+                        # 再从素菜补充
+                        if needed > 0:
+                            extra_veg = veg_recipes[2:2+needed]
+                            selected_veg.extend(extra_veg)
+                            needed -= len(extra_veg)
+                        # 最后从汤补充
+                        if needed > 0:
+                            extra_soup = soup_recipes[1:1+needed]
+                            selected_soup.extend(extra_soup)
+                    all_recipes = selected_meat + selected_veg + selected_soup
         except json.JSONDecodeError as e:
             print(f"JSON decode error: {e}, content: {content}")
         
