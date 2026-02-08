@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Camera, Upload, X, RefreshCw, Check, AlertTriangle, Plus, List, Trash2 } from 'lucide-react';
-import { useIngredientsStore } from '../stores';
+import { useIngredientsStore, useRecipesStore } from '../stores';
 import { ingredientApi } from '../services/api';
 import type { Ingredient } from '../types';
 import { incrementScannedIngredients } from './ProfilePage';
@@ -19,10 +19,12 @@ export default function ScannerPage() {
   const [newIngredient, setNewIngredient] = useState({ name: '', quantity: 1, unit: '个', category: 'other' });
   const [isAdding, setIsAdding] = useState(false);
   const [showRecipeRefreshDialog, setShowRecipeRefreshDialog] = useState(false);
+  const [showClearConfirmDialog, setShowClearConfirmDialog] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { ingredients, addIngredient, setIngredients, removeIngredient } = useIngredientsStore();
+  const { ingredients, addIngredient, setIngredients, removeIngredient, clearIngredients } = useIngredientsStore();
+  const { clearRecommendations } = useRecipesStore();
 
   useEffect(() => {
     if (mode === 'camera') {
@@ -270,6 +272,32 @@ export default function ScannerPage() {
     other: 'bg-gray-100 text-gray-600',
   };
 
+  const categoryLabels: Record<string, string> = {
+    vegetable: '蔬菜',
+    meat: '肉类',
+    seafood: '海鲜',
+    dairy: '乳制品',
+    egg: '蛋类',
+    grain: '谷物',
+    fruit: '水果',
+    seasoning: '调料',
+    beverage: '饮品',
+    other: '其他',
+  };
+
+  const categoryOptions = [
+    { value: 'vegetable', label: '蔬菜' },
+    { value: 'meat', label: '肉类' },
+    { value: 'seafood', label: '海鲜' },
+    { value: 'dairy', label: '乳制品' },
+    { value: 'egg', label: '蛋类' },
+    { value: 'grain', label: '谷物' },
+    { value: 'fruit', label: '水果' },
+    { value: 'seasoning', label: '调料' },
+    { value: 'beverage', label: '饮品' },
+    { value: 'other', label: '其他' },
+  ];
+
   return (
     <div className="space-y-6 animate-fade-in">
       <header className="text-center">
@@ -338,13 +366,23 @@ export default function ScannerPage() {
             <h3 className="text-lg font-semibold text-gray-800">
               全部食材 ({ingredients.length} 种)
             </h3>
-            <button
-              onClick={() => setShowAddForm(true)}
-              className="flex items-center space-x-1 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
-            >
-              <Plus size={18} />
-              <span>手动添加</span>
-            </button>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setShowClearConfirmDialog(true)}
+                disabled={ingredients.length === 0}
+                className="flex items-center space-x-1 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Trash2 size={16} />
+                <span>清空</span>
+              </button>
+              <button
+                onClick={() => setShowAddForm(true)}
+                className="flex items-center space-x-1 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
+              >
+                <Plus size={18} />
+                <span>手动添加</span>
+              </button>
+            </div>
           </div>
 
           {showAddForm && (
@@ -506,9 +544,17 @@ export default function ScannerPage() {
                   key={index}
                   className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg"
                 >
-                  <div className={`px-3 py-1 rounded-full text-sm font-medium ${categoryColors[ingredient.category || 'other']}`}>
-                    {ingredient.category || '未知'}
-                  </div>
+                  <select
+                    value={ingredient.category || 'other'}
+                    onChange={(e) => updateIngredient(index, 'category', e.target.value)}
+                    className={`px-3 py-1 rounded-full text-sm font-medium border-none cursor-pointer ${categoryColors[ingredient.category || 'other']}`}
+                  >
+                    {categoryOptions.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                   
                   <input
                     type="text"
@@ -667,11 +713,46 @@ export default function ScannerPage() {
               <button
                 onClick={() => {
                   setShowRecipeRefreshDialog(false);
+                  sessionStorage.setItem('forceRefreshRecipes', 'true');
                   window.location.href = '/recipes';
                 }}
                 className="flex-1 px-6 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors"
               >
                 重新推荐
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showClearConfirmDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 size={32} className="text-red-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">清空食材</h3>
+              <p className="text-gray-600">
+                确定要清空所有食材及菜谱推荐吗？此操作不可恢复。
+              </p>
+            </div>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setShowClearConfirmDialog(false)}
+                className="flex-1 px-6 py-3 border border-gray-300 rounded-xl font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => {
+                  setShowClearConfirmDialog(false);
+                  clearIngredients();
+                  clearRecommendations();
+                }}
+                className="flex-1 px-6 py-3 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-colors"
+              >
+                确定清空
               </button>
             </div>
           </div>

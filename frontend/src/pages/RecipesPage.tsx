@@ -18,6 +18,7 @@ export default function RecipesPage() {
   const [hasInitialLoad, setHasInitialLoad] = useState(false);
   const [isLoadingFromDb, setIsLoadingFromDb] = useState(false);
   const [isFirstTimeLoading, setIsFirstTimeLoading] = useState(true);
+  const isInitialLoadRef = useRef(false); // 用于强制刷新时判断是否需要设置 hasInitialLoad
 
   const { ingredients } = useIngredientsStore();
   const { recipePages, currentPage, setRecipePages, addRecipePage, setCurrentPage, recommendations, setRecommendations, loadFromDatabase, clearRecommendations, getRecipePagesLength } = useRecipesStore();
@@ -102,6 +103,23 @@ export default function RecipesPage() {
 
   // 加载数据库数据 - 只在组件挂载和食材变化时执行
   useEffect(() => {
+    // 清除标志
+    const shouldForceRefresh = sessionStorage.getItem('forceRefreshRecipes') === 'true';
+    if (shouldForceRefresh) {
+      sessionStorage.removeItem('forceRefreshRecipes');
+      console.log('[DEBUG] 检测到强制刷新标志，执行 forceRefresh');
+      
+      const loadData = async () => {
+        console.log('[DEBUG] 强制刷新 - 先加载数据库数据');
+        const loadedPageCount = await loadFromDatabase();
+        console.log('[DEBUG] 数据库加载完成，加载了', loadedPageCount, '页');
+        // 然后获取新菜谱
+        fetchRecipes([], true);
+      };
+      loadData();
+      return;
+    }
+    
     // 防止重复加载（React 严格模式会导致组件渲染两次）
     if (hasLoadedRef.current) {
       console.log('[DEBUG] 已经加载过，跳过');

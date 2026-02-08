@@ -130,6 +130,18 @@ async def delete_ingredient(ingredient_id: str, user_id: str = Query(default="00
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.delete("/")
+async def clear_all_ingredients(user_id: str = Query(default="00000000-0000-0000-0000-000000000000")):
+    try:
+        result = supabase.table("ingredients").delete().eq("user_id", user_id).execute()
+        
+        global FALLBACK_INGREDIENTS
+        FALLBACK_INGREDIENTS = [i for i in FALLBACK_INGREDIENTS if i.get("user_id") != user_id]
+        
+        return {"message": f"All ingredients cleared for user {user_id}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.put("/{ingredient_id}", response_model=IngredientResponse)
 async def update_ingredient(ingredient_id: str, ingredient: IngredientCreate, user_id: str):
     try:

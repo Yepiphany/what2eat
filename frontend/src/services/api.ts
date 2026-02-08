@@ -92,6 +92,12 @@ export const ingredientApi = {
       params: { user_id: userId },
     });
   },
+
+  clearAllIngredients: async (userId: string): Promise<void> => {
+    await api.delete('/ingredients', {
+      params: { user_id: userId },
+    });
+  },
 };
 
 export const recipeApi = {

@@ -1,18 +1,19 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Scan, Utensils, ChefHat, ArrowRight, Sparkles, Plus, X, ShoppingCart, Check, RefreshCw } from 'lucide-react';
+import { Scan, Utensils, ChefHat, ArrowRight, Sparkles, Plus, X, ShoppingCart, Check, RefreshCw, Trash2 } from 'lucide-react';
 import { useIngredientsStore, useRecipesStore } from '../stores';
 import { ingredientApi, recipeApi } from '../services/api';
 import type { Ingredient } from '../types';
 
 export default function HomePage() {
-  const { ingredients, addIngredient, setIngredients, removeIngredient } = useIngredientsStore();
-  const { recommendations, recipePages, loadFromDatabase } = useRecipesStore();
+  const { ingredients, addIngredient, setIngredients, removeIngredient, clearIngredients } = useIngredientsStore();
+  const { recommendations, recipePages, loadFromDatabase, clearRecommendations } = useRecipesStore();
   const [showAddForm, setShowAddForm] = useState(false);
   const [newIngredient, setNewIngredient] = useState({ name: '', quantity: 1, unit: '个', category: 'other' });
   const [isAdding, setIsAdding] = useState(false);
   const [shoppingLists, setShoppingLists] = useState<any[]>([]);
   const [showRecipeRefreshDialog, setShowRecipeRefreshDialog] = useState(false);
+  const [showClearConfirmDialog, setShowClearConfirmDialog] = useState(false);
 
   const expiringSoon = ingredients.filter(ing => ing.is_expiring_soon);
   const hasIngredients = ingredients.length > 0;
@@ -156,13 +157,23 @@ export default function HomePage() {
         <section className="card p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-gray-800">我的食材库存</h2>
-            <button
-              onClick={() => setShowAddForm(true)}
-              className="flex items-center space-x-1 px-3 py-1.5 bg-primary-500 text-white text-sm rounded-lg hover:bg-primary-600 transition-colors"
-            >
-              <Plus size={14} />
-              <span>手动添加</span>
-            </button>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setShowClearConfirmDialog(true)}
+                disabled={ingredients.length === 0}
+                className="flex items-center space-x-1 px-2 py-1.5 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Trash2 size={14} />
+                <span>清空</span>
+              </button>
+              <button
+                onClick={() => setShowAddForm(true)}
+                className="flex items-center space-x-1 px-3 py-1.5 bg-primary-500 text-white text-sm rounded-lg hover:bg-primary-600 transition-colors"
+              >
+                <Plus size={14} />
+                <span>手动添加</span>
+              </button>
+            </div>
           </div>
           
           {expiringSoon.length > 0 && (
@@ -408,11 +419,46 @@ export default function HomePage() {
               <button
                 onClick={() => {
                   setShowRecipeRefreshDialog(false);
+                  sessionStorage.setItem('forceRefreshRecipes', 'true');
                   window.location.href = '/recipes';
                 }}
                 className="flex-1 px-6 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors"
               >
                 重新推荐
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showClearConfirmDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 size={32} className="text-red-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">清空食材</h3>
+              <p className="text-gray-600">
+                确定要清空所有食材及菜谱推荐吗？此操作不可恢复。
+              </p>
+            </div>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setShowClearConfirmDialog(false)}
+                className="flex-1 px-6 py-3 border border-gray-300 rounded-xl font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => {
+                  setShowClearConfirmDialog(false);
+                  clearIngredients();
+                  clearRecommendations();
+                }}
+                className="flex-1 px-6 py-3 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-colors"
+              >
+                确定清空
               </button>
             </div>
           </div>

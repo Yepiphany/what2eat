@@ -13,7 +13,7 @@ interface IngredientsStore {
   updateIngredient: (id: string, data: Partial<Ingredient>) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
-  clearIngredients: () => void;
+  clearIngredients: () => Promise<void>;
 }
 
 export const useIngredientsStore = create<IngredientsStore>()(
@@ -46,7 +46,16 @@ export const useIngredientsStore = create<IngredientsStore>()(
       
       setError: (error) => set({ error }),
       
-      clearIngredients: () => set({ ingredients: [] }),
+      clearIngredients: async () => {
+        set({ ingredients: [] });
+        try {
+          const { ingredientApi } = await import('../services/api');
+          const userId = localStorage.getItem('user_id') || '00000000-0000-0000-0000-000000000000';
+          await ingredientApi.clearAllIngredients(userId);
+        } catch (e) {
+          console.error('Failed to clear ingredients from database:', e);
+        }
+      },
     }),
     {
       name: 'ingredients-storage',
