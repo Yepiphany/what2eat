@@ -80,7 +80,7 @@ interface RecipesStore {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   clearRecommendations: () => Promise<void>;
-  loadFromDatabase: () => Promise<void>;
+  loadFromDatabase: (ingredients?: string[]) => Promise<number>;
   getRecipePagesLength: () => number;
 }
 
@@ -143,11 +143,11 @@ export const useRecipesStore = create<RecipesStore>()(
         }
       },
       
-      loadFromDatabase: async () => {
+      loadFromDatabase: async (ingredients?: string[]) => {
         try {
-          console.log('[DEBUG] loadFromDatabase 开始...');
+          console.log('[DEBUG] loadFromDatabase 开始...', ingredients ? `食材过滤: ${ingredients.join(',')}` : '无过滤');
           const { recipeApi } = await import('../services/api');
-          const data = await recipeApi.getRecipePages(getUserId());
+          const data = await recipeApi.getRecipePages(getUserId(), ingredients);
           console.log('[DEBUG] loadFromDatabase 返回:', data);
           const pages = data.pages || [];
           const state = get();

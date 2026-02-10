@@ -22,14 +22,22 @@ def hash_ingredients(ingredients: List[str]) -> str:
     ingredients_str = ','.join(sorted_ingredients)
     return hashlib.md5(ingredients_str.encode()).hexdigest()
 
-@router.get("/")
-async def get_recipe_pages(user_id: str):
+@router.get("")
+async def get_recipe_pages(user_id: str, ingredients: str = None):
     try:
         supabase = get_supabase_client()
         if supabase is None:
             return {"pages": [], "current_page": 0}
         
-        result = supabase.table("recipe_pages").select("*").eq("user_id", user_id).order("page_index").execute()
+        query = supabase.table("recipe_pages").select("*").eq("user_id", user_id)
+        
+        if ingredients:
+            ingredients_list = ingredients.split(',')
+            ingredients_hash = hash_ingredients(ingredients_list)
+            query = query.eq("ingredients_hash", ingredients_hash)
+            print(f"[DEBUG] 过滤食材hash: {ingredients_hash[:8]}...")
+        
+        result = query.order("page_index").execute()
         
         print(f"[DEBUG] 查询到 {len(result.data) if result.data else 0} 条记录, user_id: {user_id[:8]}...")
         
@@ -52,7 +60,7 @@ async def get_recipe_pages(user_id: str):
         print(f"[ERROR] Failed to get recipe pages: {e}")
         return {"pages": [], "current_page": 0}
 
-@router.post("/")
+@router.post("")
 async def save_recipe_page(user_id: str, page_data: Dict[str, Any]):
     try:
         supabase = get_supabase_client()
@@ -93,7 +101,7 @@ async def save_recipe_page(user_id: str, page_data: Dict[str, Any]):
         print(f"[ERROR] Failed to save recipe page: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.delete("/")
+@router.delete("")
 async def clear_recipe_pages(user_id: str):
     try:
         supabase = get_supabase_client()

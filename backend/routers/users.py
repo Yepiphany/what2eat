@@ -8,7 +8,7 @@ from models.user_schemas import (
 router = APIRouter()
 supabase = get_supabase_client()
 
-@router.post("/", response_model=UserResponse)
+@router.post("")
 async def create_user(user: UserCreate):
     try:
         data = user.model_dump()

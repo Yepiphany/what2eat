@@ -11,8 +11,7 @@ import {
   Share2,
   ChefHat,
   Check,
-  X,
-  Plus
+  X
 } from 'lucide-react';
 import { recipeApi, cookingApi } from '../services/api';
 import { getUserId } from '../utils/userId';
@@ -81,7 +80,7 @@ export default function RecipeDetailPage() {
   const [isAdding, setIsAdding] = useState(false);
   const hasViewedRef = useRef(false);
   
-  const { currentSession, setSession } = useCookingStore();
+  const { setSession } = useCookingStore();
 
   useEffect(() => {
     if (id && !hasViewedRef.current) {
@@ -224,10 +223,10 @@ export default function RecipeDetailPage() {
                 )}
               </div>
 
-              <h1 className="text-3xl font-bold text-white mb-2">{recipe.title}</h1>
+              <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">{recipe.title}</h1>
               
               {recipe.description && (
-                <p className="text-white/80 mb-4">{recipe.description}</p>
+                <p className="text-sm md:text-base text-white/80 mb-4">{recipe.description}</p>
               )}
             </div>
             
@@ -270,14 +269,14 @@ export default function RecipeDetailPage() {
           </div>
 
           <div className="card p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-800">所需食材</h2>
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 space-y-4 md:space-y-0">
+              <h2 className="text-lg md:text-xl font-bold text-gray-800">所需食材</h2>
               
               {recipe.missing_ingredients && recipe.missing_ingredients.length > 0 && (
                 <button
                   onClick={handleAddToShoppingList}
                   disabled={isAdding || !recipe.missing_ingredients || recipe.missing_ingredients.length === 0 || isInShoppingList}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                  className={`flex items-center justify-center space-x-2 px-4 py-2 rounded-lg transition-colors text-sm md:text-base ${
                     isInShoppingList
                       ? 'bg-accent-500 text-white'
                       : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
@@ -362,17 +361,17 @@ export default function RecipeDetailPage() {
             </div>
           </div>
 
-          <div className="card p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-6">烹饪步骤</h2>
+          <div className="card p-4 md:p-6">
+            <h2 className="text-lg md:text-xl font-bold text-gray-800 mb-6">烹饪步骤</h2>
             
             <div className="space-y-6">
               {recipe.steps.map((step, index) => (
-                <div key={index} className="flex space-x-4">
-                  <div className="flex-shrink-0 w-10 h-10 bg-primary-500 rounded-full flex items-center justify-center text-white font-bold">
+                <div key={index} className="flex space-x-3 md:space-x-4">
+                  <div className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 bg-primary-500 rounded-full flex items-center justify-center text-white font-bold text-sm md:text-base">
                     {index + 1}
                   </div>
                   <div className="flex-1">
-                    <p className="text-gray-700 leading-relaxed">{step}</p>
+                    <p className="text-sm md:text-base text-gray-700 leading-relaxed">{step}</p>
                   </div>
                 </div>
               ))}
@@ -385,9 +384,9 @@ export default function RecipeDetailPage() {
             <div className="space-y-4">
               <button
                 onClick={startCooking}
-                className="w-full btn-primary py-4 text-lg font-semibold flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl transition-all"
+                className="w-full btn-primary py-3 md:py-4 text-base md:text-lg font-semibold flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl transition-all"
               >
-                <Play size={24} />
+                <Play size={22} />
                 <span>开始烹饪</span>
               </button>
 

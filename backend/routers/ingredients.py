@@ -57,7 +57,7 @@ async def scan_ingredients_base64(request: dict):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/", response_model=IngredientResponse)
+@router.post("")
 async def add_ingredient(ingredient: IngredientCreate, user_id: str):
     try:
         ensure_user_exists(user_id)
@@ -149,7 +149,7 @@ async def delete_ingredient(ingredient_id: str, user_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.delete("/")
+@router.delete("")
 async def clear_all_ingredients(user_id: str):
     try:
         result = supabase.table("ingredients").delete().eq("user_id", user_id).execute()

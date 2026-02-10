@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ChevronLeft, ShoppingCart, Trash2, Check, X, Plus } from 'lucide-react';
+import { ChevronLeft, ShoppingCart, Trash2, Check, Plus } from 'lucide-react';
 import { recipeApi } from '../services/api';
 import { getUserId } from '../utils/userId';
 
@@ -72,16 +72,6 @@ export default function ShoppingPage() {
       console.error('Failed to load shopping lists:', error);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleToggle = async (itemId: string) => {
-    try {
-      await recipeApi.toggleShoppingListItem(getUserId(), itemId, 0);
-      loadShoppingLists();
-      loadCounts();
-    } catch (error) {
-      console.error('Failed to toggle item:', error);
     }
   };
 

@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
 import HomePage from './pages/HomePage';
 import ScannerPage from './pages/ScannerPage';

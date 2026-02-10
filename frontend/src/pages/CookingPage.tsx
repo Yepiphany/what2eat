@@ -9,18 +9,15 @@ import {
   StepForward,
   Check,
   Clock,
-  Volume2,
-  VolumeX,
   ChefHat,
   Timer,
-  Sparkles,
   Home,
   RotateCcw
 } from 'lucide-react';
 import { cookingApi } from '../services/api';
 import { useCookingStore } from '../stores';
 import { getUserId } from '../utils/userId';
-import type { CookingSession, CookingStep } from '../types';
+import type { CookingSession } from '../types';
 
 const voiceCommands = [
   '下一步',
@@ -42,8 +39,10 @@ export default function CookingPage() {
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(false);
   const [showTips, setShowTips] = useState(true);
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [stepTimer, setStepTimer] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
+  const [stepTimer, setStepTimer] = useState<number | null>(null);
+  const [isStepTimerActive, setIsStepTimerActive] = useState(false);
+  const [showCompletionDialog, setShowCompletionDialog] = useState(false);
   
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -71,17 +70,8 @@ export default function CookingPage() {
 
   useEffect(() => {
     if (isTimerRunning && session?.steps[session.current_step]?.duration_seconds) {
-      setStepTimer(0);
       timerRef.current = setInterval(() => {
         setElapsedTime(prev => prev + 1);
-        setStepTimer(prev => {
-          const currentStep = session?.steps[session.current_step];
-          if (currentStep?.duration_seconds && prev >= currentStep.duration_seconds) {
-            setIsTimerRunning(false);
-            return currentStep.duration_seconds;
-          }
-          return prev + 1;
-        });
       }, 1000);
     } else {
       if (timerRef.current) {
@@ -95,6 +85,31 @@ export default function CookingPage() {
       }
     };
   }, [isTimerRunning, session]);
+
+  useEffect(() => {
+    if (isStepTimerActive && stepTimer !== null && stepTimer > 0) {
+      stepTimerRef.current = setInterval(() => {
+        setStepTimer(prev => (prev !== null && prev > 0 ? prev - 1 : 0));
+      }, 1000);
+    } else {
+      if (stepTimerRef.current) {
+        clearInterval(stepTimerRef.current);
+      }
+      if (stepTimer === 0) {
+        setIsStepTimerActive(false);
+        // 可以添加一个提示音或通知
+        if ('speechSynthesis' in window && isVoiceEnabled) {
+          speakStep('当前步骤时间到');
+        }
+      }
+    }
+    
+    return () => {
+      if (stepTimerRef.current) {
+        clearInterval(stepTimerRef.current);
+      }
+    };
+  }, [isStepTimerActive, stepTimer, isVoiceEnabled]);
 
   const cleanup = () => {
     if (recognitionRef.current) {
@@ -111,13 +126,21 @@ export default function CookingPage() {
   const fetchOrCreateSession = async () => {
     setIsLoading(true);
     try {
+      let activeSession: CookingSession;
       if (currentSession && currentSession.recipe_id === recipeId) {
+        activeSession = currentSession;
         setSession(currentSession);
         setElapsedTime(calculateElapsedTime(currentSession));
       } else {
-        const newSession = await cookingApi.startSession(recipeId!, getUserId());
-        setSession(newSession);
-        setGlobalSession(newSession);
+        activeSession = await cookingApi.startSession(recipeId!, getUserId());
+        setSession(activeSession);
+        setGlobalSession(activeSession);
+      }
+      
+      // 初始化当前步骤计时器
+      const currentStepData = activeSession.steps[activeSession.current_step];
+      if (currentStepData?.duration_seconds) {
+        setStepTimer(currentStepData.duration_seconds);
       }
     } catch (error) {
       console.error('Failed to fetch session:', error);
@@ -152,18 +175,29 @@ export default function CookingPage() {
       const last = event.results.length - 1;
       const command = event.results[last][0].transcript.trim().toLowerCase();
       
+      console.log('[VOICE] 识别到命令:', command);
+      
       if (voiceCommands.some(cmd => command.includes(cmd.toLowerCase()))) {
         advanceStep();
       }
     };
     
-    recognition.onerror = () => {
+    recognition.onerror = (event: any) => {
+      console.error('[VOICE] 识别错误:', event.error);
+      if (event.error === 'not-allowed') {
+        alert('请开启麦克风权限以使用语音控制');
+        setIsVoiceEnabled(false);
+      }
       setIsListening(false);
     };
     
     recognition.onend = () => {
-      if (isListening) {
-        recognition.start();
+      if (isListening && isVoiceEnabled) {
+        try {
+          recognition.start();
+        } catch (e) {
+          console.error('[VOICE] 重新启动失败:', e);
+        }
       }
     };
     
@@ -178,48 +212,114 @@ export default function CookingPage() {
     }
   };
 
-  const advanceStep = async () => {
+  const advanceStep = async (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation(); // 防止冒泡
     if (!session) return;
     
+    const isLast = session.current_step >= session.steps.length - 1;
+
+    // 乐观更新：立即在本地跳转到下一步，提升响应速度
+    if (!isLast) {
+      const nextIdx = session.current_step + 1;
+      const nextStep = session.steps[nextIdx];
+      
+      const optimisticSession = { ...session, current_step: nextIdx };
+      setSession(optimisticSession);
+      setGlobalSession(optimisticSession);
+      
+      if (nextStep?.duration_seconds) {
+        setStepTimer(nextStep.duration_seconds);
+        setIsStepTimerActive(isTimerRunning);
+      } else {
+        setStepTimer(null);
+        setIsStepTimerActive(false);
+      }
+
+      if (isVoiceEnabled) {
+        speakStep(`下一步：${nextStep?.instruction || ''}`);
+      }
+    }
+
     try {
-      const updatedSession = await cookingApi.advanceStep(
-        session.id,
-        getUserId(),
-        undefined,
-        true
-      );
-      setSession(updatedSession);
-      setGlobalSession(updatedSession);
-      setStepTimer(0);
-      setIsTimerRunning(false);
+      if (!isLast) {
+        const updatedSession = await cookingApi.advanceStep(
+          session.id,
+          getUserId(),
+          undefined,
+          true
+        );
+        // 后端返回后更新最终状态（以防万一有细微差异）
+        setSession(updatedSession);
+        setGlobalSession(updatedSession);
+      } else {
+        // 最后一步，显示完成确认对话框
+        setShowCompletionDialog(true);
+        setIsTimerRunning(false);
+        setIsStepTimerActive(false);
+        speakStep('太棒了，您已完成所有烹饪步骤！');
+      }
     } catch (error) {
       console.error('Failed to advance step:', error);
+      // 如果报错，本地已经跳转了，不需要处理，除非需要回滚（通常不建议，会闪烁）
+    }
+  };
+
+  const goToStep = async (stepIndex: number) => {
+    if (!session || stepIndex === session.current_step) return;
+    
+    // 更新本地状态以支持自由跳转
+    const updatedSession = { ...session, current_step: stepIndex };
+    setSession(updatedSession);
+    setGlobalSession(updatedSession);
+    
+    const step = updatedSession.steps[stepIndex];
+    if (step?.duration_seconds) {
+      setStepTimer(step.duration_seconds);
+      setIsStepTimerActive(true); // 跳转后自动开启计时器
+    } else {
+      setStepTimer(null);
+      setIsStepTimerActive(false);
+    }
+
+    // 自动语音播报跳转后的步骤
+    if (isVoiceEnabled) {
+      speakStep(`跳转到第${stepIndex + 1}步：${step?.instruction || ''}`);
     }
   };
 
   const pauseCooking = async () => {
     if (!session) return;
     
+    // 乐观更新：立即停止本地计时器，消除延迟感
+    setIsTimerRunning(false);
+    setIsStepTimerActive(false);
+
     try {
       const updatedSession = await cookingApi.pauseSession(session.id, getUserId());
       setSession(updatedSession);
       setGlobalSession(updatedSession);
-      setIsTimerRunning(false);
     } catch (error) {
       console.error('Failed to pause:', error);
+      // 后端失败时，本地已经停了，不需要回滚状态，保证用户体验
     }
   };
 
   const resumeCooking = async () => {
     if (!session) return;
     
+    // 乐观更新：立即开始本地计时器
+    setIsTimerRunning(true);
+    if (stepTimer !== null && stepTimer > 0) {
+      setIsStepTimerActive(true);
+    }
+
     try {
       const updatedSession = await cookingApi.resumeSession(session.id, getUserId());
       setSession(updatedSession);
       setGlobalSession(updatedSession);
-      setIsTimerRunning(true);
     } catch (error) {
       console.error('Failed to resume:', error);
+      // 后端失败时，保持本地运行状态
     }
   };
 
@@ -227,13 +327,12 @@ export default function CookingPage() {
     if (!session) return;
     
     try {
-      const updatedSession = await cookingApi.completeSession(session.id, getUserId());
+      await cookingApi.completeSession(session.id, getUserId());
       clearSession();
       const newSession = await cookingApi.startSession(recipeId!, getUserId());
       setSession(newSession);
       setGlobalSession(newSession);
       setElapsedTime(0);
-      setStepTimer(0);
       setIsTimerRunning(false);
     } catch (error) {
       console.error('Failed to restart:', error);
@@ -253,6 +352,21 @@ export default function CookingPage() {
       utterance.lang = 'zh-CN';
       utterance.rate = 0.9;
       window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  const handleCompleteCooking = async () => {
+    if (!session) return;
+    try {
+      await cookingApi.completeSession(session.id, getUserId());
+      const updatedSession = { ...session, status: 'completed' as const };
+      setSession(updatedSession);
+      setGlobalSession(updatedSession);
+      setShowCompletionDialog(false);
+      navigate('/recipes');
+    } catch (error) {
+      console.error('Failed to complete cooking:', error);
+      navigate('/recipes');
     }
   };
 
@@ -326,38 +440,83 @@ export default function CookingPage() {
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl p-8 text-white relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
-              <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2" />
+            <div 
+              onClick={(e) => advanceStep(e)}
+              className="bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl p-6 md:p-10 text-white relative overflow-hidden shadow-xl cursor-pointer hover:shadow-2xl transition-all group active:scale-[0.99]"
+            >
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-110 transition-transform duration-700" />
+              <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2 group-hover:scale-110 transition-transform duration-700" />
               
               <div className="relative z-10">
-                <div className="flex items-center space-x-3 mb-4">
-                  <span className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center text-2xl font-bold">
-                    {session.current_step + 1}
-                  </span>
-                  <span className="text-white/80">步骤 {session.current_step + 1}</span>
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center space-x-3">
+                    <span className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-2xl font-bold shadow-inner">
+                      {session.current_step + 1}
+                    </span>
+                    <span className="text-white/80 font-medium">步骤 {session.current_step + 1}</span>
+                  </div>
+                  
+                  <div className="flex items-center space-x-4">
+                    {stepTimer !== null && (
+                      <div 
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center space-x-2 bg-black/20 backdrop-blur-md px-4 py-2 rounded-full border border-white/20"
+                      >
+                        <Timer size={18} className={isStepTimerActive ? 'animate-pulse text-accent-400' : 'text-white/80'} />
+                        <span className="font-mono text-xl font-bold tracking-wider">
+                          {formatTime(stepTimer)}
+                        </span>
+                      </div>
+                    )}
+                    {/* 已删除“点击进入下一步”引导 */}
+                  </div>
                 </div>
                 
-                <p className="text-2xl font-medium leading-relaxed mb-4">
+                <p className="text-2xl md:text-3xl font-medium leading-relaxed mb-8 min-h-[100px]">
                   {currentStep?.instruction || '准备开始烹饪'}
                 </p>
 
-                {currentStep?.tips && (
-                  <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 mt-4">
-                    <p className="text-sm text-white/90">
-                      💡 小贴士：{currentStep.tips}
-                    </p>
-                  </div>
-                )}
-
-                  {currentStep?.duration_seconds && (
-                    <div className="mt-4 flex items-center space-x-2">
-                      <Timer size={18} className="text-white/80" />
-                      <span className="text-white/80">
-                        建议时间：{Math.floor(currentStep.duration_seconds / 60)} 分钟
-                      </span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                  {currentStep?.tips && (
+                    <div 
+                      onClick={(e) => e.stopPropagation()}
+                      className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/10"
+                    >
+                      <div className="flex items-start space-x-2">
+                        <span className="text-lg">💡</span>
+                        <p className="text-sm text-white/90 leading-relaxed">
+                          {currentStep.tips}
+                        </p>
+                      </div>
                     </div>
                   )}
+
+                  {currentStep?.duration_seconds && (
+                    <div 
+                      onClick={(e) => e.stopPropagation()}
+                      className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/10 flex items-center justify-between"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <Timer size={18} className="text-white/80" />
+                        <span className="text-sm text-white/80">
+                          建议时间：{Math.floor(currentStep.duration_seconds / 60)} 分钟
+                        </span>
+                      </div>
+                      {/* 已删除建议时间旁的暂停按钮 */}
+                    </div>
+                  )}
+                </div>
+
+                {/* 移动端快捷下一步按钮 */}
+                <div className="mt-8 lg:hidden">
+                  <button
+                    onClick={(e) => advanceStep(e)}
+                    className="w-full py-4 bg-white text-primary-600 rounded-xl font-bold text-lg shadow-lg active:scale-95 transition-all flex items-center justify-center space-x-2"
+                  >
+                    <StepForward size={22} />
+                    <span>{isLastStep ? '完成烹饪' : '下一步'}</span>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -399,11 +558,12 @@ export default function CookingPage() {
               {session.steps.map((step, index) => (
                 <div
                   key={step.step_number}
-                  className={`p-3 rounded-lg transition-all ${
+                  onClick={() => goToStep(index)}
+                  className={`p-3 rounded-lg transition-all cursor-pointer hover:shadow-md ${
                     index < session.current_step
-                      ? 'bg-accent-50 border border-accent-200'
+                      ? 'bg-accent-50 border border-accent-200 opacity-80'
                       : index === session.current_step
-                      ? 'bg-primary-50 border-2 border-primary-500'
+                      ? 'bg-primary-50 border-2 border-primary-500 ring-2 ring-primary-100'
                       : 'bg-gray-50 border border-gray-200'
                   }`}
                 >
@@ -436,7 +596,7 @@ export default function CookingPage() {
             </div>
 
             <div className="mt-6 space-y-3">
-              {session.status === 'in_progress' ? (
+              {session.status !== 'completed' ? (
                 <>
                   <button
                     onClick={isTimerRunning ? pauseCooking : resumeCooking}
@@ -450,20 +610,20 @@ export default function CookingPage() {
                     ) : (
                       <>
                         <Play size={20} />
-                        <span>继续</span>
+                        <span>开始/继续</span>
                       </>
                     )}
                   </button>
                   
                   <button
-                    onClick={advanceStep}
+                    onClick={(e) => advanceStep(e)}
                     className="w-full btn-primary py-3 flex items-center justify-center space-x-2"
                   >
                     <StepForward size={20} />
                     <span>{isLastStep ? '完成烹饪' : '下一步'}</span>
                   </button>
                 </>
-              ) : session.status === 'completed' ? (
+              ) : (
                 <div className="text-center">
                   <div className="w-16 h-16 bg-accent-500 rounded-full flex items-center justify-center mx-auto mb-4">
                     <Check size={32} className="text-white" />
@@ -487,17 +647,6 @@ export default function CookingPage() {
                     </button>
                   </div>
                 </div>
-              ) : (
-                <button
-                  onClick={() => {
-                    resumeCooking();
-                    speakStep(currentStep?.instruction || '开始烹饪');
-                  }}
-                  className="w-full btn-primary py-4 flex items-center justify-center space-x-2 text-lg"
-                >
-                  <Play size={24} />
-                  <span>开始烹饪</span>
-                </button>
               )}
             </div>
 
@@ -516,7 +665,6 @@ export default function CookingPage() {
               {showTips && (
                 <div className="mt-4 space-y-2 text-sm text-gray-500 animate-slide-up">
                   <p>• 烹饪前准备好所有食材和调料</p>
-                  <p>• 按照步骤顺序进行，不要跳过</p>
                   <p>• 使用语音控制可以解放双手</p>
                   <p>• 注意安全，使用厨具时小心烫伤</p>
                 </div>
@@ -525,6 +673,34 @@ export default function CookingPage() {
           </div>
         </div>
       </div>
+
+      {/* 完成烹饪对话框 */}
+      {showCompletionDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl animate-scale-up text-center">
+            <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Check size={40} />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">太棒了！</h2>
+            <p className="text-gray-600 mb-8">您已完成所有烹饪步骤。现在要返回菜谱列表吗？</p>
+            
+            <div className="space-y-3">
+              <button
+                onClick={handleCompleteCooking}
+                className="w-full btn-primary py-3 font-bold text-lg"
+              >
+                返回菜谱页
+              </button>
+              <button
+                onClick={() => setShowCompletionDialog(false)}
+                className="w-full py-3 text-gray-500 font-medium hover:text-gray-700 transition-colors"
+              >
+                留在本页
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

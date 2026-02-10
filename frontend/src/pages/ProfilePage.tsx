@@ -1,23 +1,16 @@
 import { useState, useEffect } from 'react';
 import {
   User,
-  Settings,
-  Heart,
-  Clock,
-  ChefHat,
-  Sun,
   HelpCircle,
   LogOut,
   Save,
   Edit2,
   Check,
   Camera,
-  Trophy,
-  Calendar,
   TrendingUp,
   X
 } from 'lucide-react';
-import { useUserStore, useIngredientsStore, useRecipesStore } from '../stores';
+import { useUserStore, useIngredientsStore } from '../stores';
 import { userApi } from '../services/api';
 import { getUserId } from '../utils/userId';
 import type { TastePreference, DietType } from '../types';
@@ -71,7 +64,6 @@ export default function ProfilePage() {
   
   const { currentUser, setUser, isAuthenticated, updatePreferences, logout } = useUserStore();
   const { ingredients } = useIngredientsStore();
-  const { recommendations } = useRecipesStore();
 
   useEffect(() => {
     if (currentUser) {

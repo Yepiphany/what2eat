@@ -77,11 +77,11 @@ async def get_recipe(recipe_id: str):
     
     raise HTTPException(status_code=404, detail="菜谱不存在")
 
-@router.get("/")
+@router.get("")
 async def get_recipes():
     return []
 
-@router.post("/")
+@router.post("")
 async def create_recipe(request):
     return {
         "id": "new_recipe_1",

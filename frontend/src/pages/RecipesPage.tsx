@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Filter, Clock, X, RefreshCw, Trash2 } from 'lucide-react';
+import { Clock, X, RefreshCw, Trash2 } from 'lucide-react';
 import { useIngredientsStore, useRecipesStore, useUserStore } from '../stores';
 import { recipeApi } from '../services/api';
 import type { Recipe, DietType, TastePreference } from '../types';
@@ -18,17 +18,18 @@ export default function RecipesPage() {
   const [hasInitialLoad, setHasInitialLoad] = useState(false);
   const [isLoadingFromDb, setIsLoadingFromDb] = useState(false);
   const [isFirstTimeLoading, setIsFirstTimeLoading] = useState(true);
-  const isInitialLoadRef = useRef(false); // 用于强制刷新时判断是否需要设置 hasInitialLoad
+  // isInitialLoadRef removed as it was unused
 
   const { ingredients } = useIngredientsStore();
   const { recipePages, currentPage, setRecipePages, addRecipePage, setCurrentPage, recommendations, setRecommendations, loadFromDatabase, clearRecommendations, getRecipePagesLength } = useRecipesStore();
-  const { currentUser, preferences } = useUserStore();
+  const { preferences } = useUserStore();
 
   const availableIngredientNames = useMemo(() =>
     ingredients.map(ing => ing.name)
   , [ingredients]);
   const [excludedIngredients, setExcludedIngredients] = useState<string[]>([]);
   const hasLoadedRef = useRef(false); // 防止重复加载
+  const lastIngredientsRef = useRef<string[]>([]); // 记录上次加载的食材
   const isFetchingRef = useRef(false); // 防止并发调用 fetchRecipes
 
   // 定义 fetchRecipes 函数，使用 useCallback 缓存
@@ -111,7 +112,9 @@ export default function RecipesPage() {
       
       const loadData = async () => {
         console.log('[DEBUG] 强制刷新 - 先加载数据库数据');
-        const loadedPageCount = await loadFromDatabase();
+        hasLoadedRef.current = true;
+        lastIngredientsRef.current = [...availableIngredientNames];
+        const loadedPageCount = await loadFromDatabase(availableIngredientNames);
         console.log('[DEBUG] 数据库加载完成，加载了', loadedPageCount, '页');
         // 然后获取新菜谱
         fetchRecipes([], true);
@@ -120,20 +123,24 @@ export default function RecipesPage() {
       return;
     }
     
+    // 检查食材是否发生变化
+    const ingredientsChanged = JSON.stringify(lastIngredientsRef.current) !== JSON.stringify(availableIngredientNames);
+    
     // 防止重复加载（React 严格模式会导致组件渲染两次）
-    if (hasLoadedRef.current) {
-      console.log('[DEBUG] 已经加载过，跳过');
+    if (hasLoadedRef.current && !ingredientsChanged) {
+      console.log('[DEBUG] 已经加载过且食材未变，跳过');
       return;
     }
     
-    // 只在食材列表非空且尚未加载时执行
+    // 只在食材列表非空时执行
     if (availableIngredientNames.length === 0) {
       console.log('[DEBUG] 食材列表为空，跳过加载');
       return;
     }
     
-    if (hasInitialLoad) {
-      console.log('[DEBUG] 已经初始化过，跳过加载');
+    // 如果已经初始化过且食材未变，跳过
+    if (hasInitialLoad && !ingredientsChanged) {
+      console.log('[DEBUG] 已经初始化过且食材未变，跳过加载');
       return;
     }
     
@@ -143,10 +150,11 @@ export default function RecipesPage() {
     }
     
     const loadData = async () => {
-      console.log('[DEBUG] 开始加载数据库, hasLoadedRef=', hasLoadedRef.current);
+      console.log('[DEBUG] 开始加载数据库, ingredientsChanged=', ingredientsChanged);
       hasLoadedRef.current = true; // 标记已加载
+      lastIngredientsRef.current = [...availableIngredientNames]; // 记录当前食材
       setIsLoadingFromDb(true);
-      const loadedPageCount = await loadFromDatabase();
+      const loadedPageCount = await loadFromDatabase(availableIngredientNames);
       console.log('[DEBUG] 数据库加载完成，加载了', loadedPageCount, '页, 类型:', typeof loadedPageCount);
       setHasInitialLoad(true);
       setIsLoadingFromDb(false);
@@ -242,8 +250,8 @@ export default function RecipesPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       <header className="text-center">
-        <h1 className="text-3xl font-bold text-gray-800">🍳 智能菜谱推荐</h1>
-        <p className="text-gray-500 mt-2">
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-800">🍳 智能菜谱推荐</h1>
+        <p className="text-gray-500 mt-1 md:mt-2 text-sm md:text-base">
           {availableIngredientNames.length > 0 ? (
             <>基于 {availableIngredientNames.length} 种食材，为您推荐四菜一汤</>
           ) : (
@@ -253,25 +261,25 @@ export default function RecipesPage() {
       </header>
 
       {isLoading || isLoadingFromDb || (isFirstTimeLoading && availableIngredientNames.length > 0) ? (
-        <div className="flex justify-center py-12">
+        <div className="flex justify-center py-8 md:py-12">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4" />
-            <p className="text-gray-600">AI 正在为您设计四菜一汤...</p>
-            <p className="text-gray-400 text-sm mt-1">这可能需要几秒钟</p>
+            <div className="animate-spin rounded-full h-10 w-10 md:h-12 md:w-12 border-b-2 border-primary-500 mx-auto mb-3 md:mb-4" />
+            <p className="text-gray-600 text-sm md:text-base">AI 正在为您设计四菜一汤...</p>
+            <p className="text-gray-400 text-xs md:text-sm mt-1">这可能需要几秒钟</p>
           </div>
         </div>
       ) : availableIngredientNames.length === 0 ? (
-        <div className="text-center py-12">
-          <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-4xl">🥗</span>
+        <div className="text-center py-8 md:py-12">
+          <div className="w-20 h-20 md:w-24 md:h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3 md:mb-4">
+            <span className="text-3xl md:text-4xl">🥗</span>
           </div>
-          <h3 className="text-xl font-semibold text-gray-800 mb-2">
+          <h3 className="text-base md:text-xl font-semibold text-gray-800 mb-1 md:mb-2">
             还没有食材
           </h3>
-          <p className="text-gray-500 mb-6 max-w-md mx-auto">
+          <p className="text-xs md:text-base text-gray-500 mb-4 md:mb-6 max-w-md mx-auto px-4">
             添加食材到库存后，AI 将根据您的食材推荐四菜一汤
           </p>
-          <Link to="/scanner" className="btn-primary">
+          <Link to="/scanner" className="btn-primary text-sm md:text-base">
             扫描添加食材
           </Link>
         </div>
@@ -295,16 +303,16 @@ export default function RecipesPage() {
             </div>
           </div>
 
-          <div className="flex justify-center pt-6 space-x-4">
+          <div className="flex justify-center pt-4 md:pt-6 space-x-3 md:space-x-4">
             {totalPages > 1 && (
               <div className="flex items-center space-x-2">
                 {Array.from({ length: totalPages }).map((_, index) => (
                   <button
                     key={index}
                     onClick={() => handlePageChange(index)}
-                    className={`w-3 h-3 rounded-full transition-all ${
+                    className={`w-2.5 h-2.5 md:w-3 md:h-3 rounded-full transition-all ${
                       currentPage === index
-                        ? 'bg-primary-500 w-6'
+                        ? 'bg-primary-500 w-5 md:w-6'
                         : 'bg-gray-300 hover:bg-gray-400'
                     }`}
                   />
@@ -314,37 +322,38 @@ export default function RecipesPage() {
             <button
               onClick={handleRefresh}
               disabled={isLoading}
-              className="flex items-center space-x-2 px-8 py-4 bg-primary-500 text-white rounded-full hover:bg-primary-600 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 md:flex-none flex items-center justify-center space-x-1 md:space-x-2 px-4 md:px-8 py-2.5 md:py-4 bg-primary-500 text-white rounded-full hover:bg-primary-600 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <RefreshCw size={22} className={isLoading ? 'animate-spin' : ''} />
-              <span className="text-lg font-medium">不合胃口？</span>
+              <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
+              <span className="text-sm md:text-lg font-medium">不合胃口？</span>
             </button>
             <button
               onClick={handleClearRecipes}
               disabled={isLoading}
-              className="flex items-center space-x-2 px-6 py-4 bg-red-500 text-white rounded-full hover:bg-red-600 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 md:flex-none flex items-center justify-center space-x-1 md:space-x-2 px-3 md:px-6 py-2.5 md:py-4 bg-red-500 text-white rounded-full hover:bg-red-600 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Trash2 size={20} />
-              <span className="text-lg font-medium">清空菜谱</span>
+              <Trash2 size={16} className="md:hidden" />
+              <Trash2 size={18} className="hidden md:block" />
+              <span className="text-sm md:text-lg font-medium">清空菜谱</span>
             </button>
           </div>
         </>
       ) : (
-        <div className="text-center py-12">
-          <div className="w-72 h-72 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-9xl">🍽️</span>
+        <div className="text-center py-8 md:py-12">
+          <div className="w-48 h-48 md:w-72 md:h-72 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3 md:mb-4">
+            <span className="text-6xl md:text-9xl">🍽️</span>
           </div>
-          <h3 className="text-xl font-semibold text-gray-400 mb-8">
+          <h3 className="text-base md:text-xl font-semibold text-gray-400 mb-4 md:mb-8">
             暂无菜谱推荐
           </h3>
 
           <button
             onClick={handleRefresh}
             disabled={isLoading}
-            className="flex items-center space-x-2 px-8 py-4 bg-primary-500 text-white rounded-full hover:bg-primary-600 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed mx-auto"
+            className="flex items-center space-x-2 px-6 md:px-8 py-3 md:py-4 bg-primary-500 text-white rounded-full hover:bg-primary-600 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed mx-auto"
           >
-            <RefreshCw size={22} className={isLoading ? 'animate-spin' : ''} />
-            <span className="text-lg font-medium">获取推荐</span>
+            <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
+            <span className="text-sm md:text-lg font-medium">获取推荐</span>
           </button>
         </div>
       )}
@@ -478,7 +487,7 @@ function RecipeCard({ recipe, getDifficultyColor }: { recipe: Recipe; getDifficu
       </div>
       
       <div className="p-5">
-        <h3 className="text-lg font-semibold text-gray-800 mb-2 group-hover:text-primary-600 transition-colors">
+        <h3 className="text-base md:text-lg font-semibold text-gray-800 mb-2 group-hover:text-primary-600 transition-colors">
           {recipe.title}
         </h3>
         

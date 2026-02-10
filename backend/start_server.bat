@@ -52,4 +52,4 @@ echo     按 Ctrl+C 停止服务器
 echo ========================================
 echo.
 
-"%PYTHON_PATH%" -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+"%PYTHON_PATH%" -m uvicorn main:app --host 0.0.0.0 --port 7860 --reload

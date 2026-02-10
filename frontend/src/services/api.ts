@@ -4,12 +4,11 @@ import type {
   Recipe,
   CookingSession,
   User,
-  RecipeRecommendationRequest,
-  ShoppingList
+  RecipeRecommendationRequest
 } from '../types';
 import { getUserId } from '../utils/userId';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -47,6 +46,12 @@ export const ingredientApi = {
     const response = await api.post('/ingredients/scan', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
+    return response.data;
+  },
+
+  scanImageBase64: async (imageBase64: string): Promise<Ingredient[]> => {
+    const base64Data = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64;
+    const response = await api.post('/ingredients/scan-base64', { image: base64Data });
     return response.data;
   },
 
@@ -157,8 +162,12 @@ export const recipeApi = {
     return response.data;
   },
 
-  getRecipePages: async (userId: string): Promise<{ pages: Recipe[][]; current_page: number }> => {
-    const response = await api.get('/recipe-pages', { params: { user_id: userId } });
+  getRecipePages: async (userId: string, ingredients?: string[]): Promise<{ pages: Recipe[][]; current_page: number }> => {
+    const params: any = { user_id: userId };
+    if (ingredients && ingredients.length > 0) {
+      params.ingredients = ingredients.join(',');
+    }
+    const response = await api.get('/recipe-pages', { params });
     return response.data;
   },
 
@@ -234,7 +243,8 @@ export const cookingApi = {
   },
 
   connectWebSocket: (sessionId: string): WebSocket => {
-    const wsUrl = `${API_BASE_URL.replace('http', 'ws')}/cooking/ws/${sessionId}`;
+    const base = API_BASE_URL.startsWith('http') ? API_BASE_URL : `${window.location.origin}${API_BASE_URL}`;
+    const wsUrl = `${base.replace('http', 'ws')}/cooking/ws/${sessionId}`;
     return new WebSocket(wsUrl);
   },
 };
@@ -266,7 +276,7 @@ export const userApi = {
   ): Promise<User> => {
     const validUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     const uid = validUuid.test(userId) ? userId : getUserId();
-    const response = await api.put(`/users/${uid}/preferences`, null, { params: preferences });
+    const response = await api.put(`/users/${uid}/preferences`, preferences);
     return response.data;
   },
 

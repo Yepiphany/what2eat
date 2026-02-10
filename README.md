@@ -1,259 +1,446 @@
-# What2Eat (今天吃什么)
+# What2Eat 今天吃什么
 
-一站式饮食决策与管理平台，消除用户的"选择困难症"，平衡营养健康与决策效率。
+## 一、项目简介
 
-## ✨ 功能特性
+**What2Eat（今天吃什么）** 是一款面向家庭与个人的 **一站式AI 智能饮食决策助手**，聚焦于日常生活中高频却被长期忽视的真实问题——**“今天吃什么”**。项目围绕「**库存可见 → 决策推荐→ 采购补全 → 烹饪执行 **」这一完整饮食链路展开，核心能力包括：
 
-### 1. 🤖 AI 视觉识材（扫一扫冰箱）
-- 用户拍摄冰箱内部或食材照片
-- 系统通过计算机视觉识别蔬菜、肉类、蛋奶等
-- 自动同步到"虚拟库存"
-- 对即将过期的食材进行高亮提醒
-- 优先推荐相关菜谱
+- **扫一扫冰箱**：通过AI图像识别快速获取当前冰箱内已有食材
+- **多约束菜谱推荐**：基于已有食材库存、口味偏好、饮食类型、最大烹饪时间、烹饪水平等条件生成候选菜谱
+- **智能采购清单**：对比菜谱与库存，自动生成缺口食材清单，以便用户可轻松完成采购
+- **烹饪过程引导**：将推荐从“结果”延伸到“执行”，降低实际下厨门槛
 
-### 2. 🍳 "因材施教" 菜谱推荐
-- 根据"虚拟库存"中已有的食材，匹配最适合的菜谱
-- 口味偏好画像：川味、生酮饮食、减脂、快手菜等
-- 智能补全方案：自动生成"补货清单"
-- 多维度筛选：烹饪时间、难度、饮食类型等
+<img src="asset/homepage.png" alt="Home Page" style="zoom: 33%;" />
 
-### 3. 👨‍🍳 烹饪引导
-- 详细分步骤语音引导
-- 支持语音交互（"下一步"、"继续"）
-- 实时计时器
-- 小贴士提示
+在技术架构上，前端采用 **React + Vite** 构建高响应 UI，后端使用 **FastAPI** 提供轻量 API 服务，数据层以 **Supabase** 为主，并设计了 Demo 模式下无数据库可运行的兜底方案，确保项目在 Hackathon、展示与弱网络环境中依然可完整体验。
 
-## 🛠️ 技术栈
+项目目标并非“做一个菜谱大全”，而是通过 AI 将饮食决策从模糊、纠结、浪费，转变为可执行、可持续、可扩展的智能流程。
 
-- **前端**: React 18 + TypeScript + Vite
-- **UI框架**: TailwindCSS + Lucide React
-- **状态管理**: Zustand
-- **后端**: Python + FastAPI
-- **数据库**: Supabase (PostgreSQL)
-- **AI服务**: OpenAI GPT-4o (视觉识别)
-- **语音识别**: Web Speech API
+代码仓库：https://github.com/Yepiphany/what2eat
 
-## 📁 项目结构
+## 二、业务价值
 
-```
-what2eat/
-├── backend/                    # FastAPI 后端
-│   ├── main.py                # 应用入口
-│   ├── requirements.txt       # Python依赖
-│   ├── routers/               # API路由
-│   │   ├── ingredients.py    # 食材管理
-│   │   ├── recipes.py         # 菜谱推荐
-│   │   ├── cooking.py         # 烹饪引导
-│   │   └── users.py           # 用户管理
-│   ├── services/              # 业务逻辑
-│   │   ├── vision_service.py  # 视觉识别
-│   │   ├── recipe_service.py  # 菜谱推荐
-│   │   └── cooking_service.py # 烹饪引导
-│   └── models/                # 数据模型
-│       ├── schemas.py
-│       ├── recipe_schemas.py
-│       ├── cooking_schemas.py
-│       ├── user_schemas.py
-│       └── database.py
-├── frontend/                  # React 前端
-│   ├── src/
-│   │   ├── components/        # 通用组件
-│   │   │   └── Layout.tsx
-│   │   ├── pages/             # 页面组件
-│   │   │   ├── HomePage.tsx
-│   │   │   ├── ScannerPage.tsx
-│   │   │   ├── RecipesPage.tsx
-│   │   │   ├── RecipeDetailPage.tsx
-│   │   │   ├── CookingPage.tsx
-│   │   │   └── ProfilePage.tsx
-│   │   ├── services/          # API服务
-│   │   │   └── api.ts
-│   │   ├── stores/            # 状态管理
-│   │   │   └── index.ts
-│   │   └── types/             # TypeScript类型
-│   │       └── index.ts
-│   └── package.json
-└── supabase/                  # Supabase配置
-    └── config/
-        └── schema.sql         # 数据库Schema
-```
+### 1. 减少浪费与成本控制
 
-## 🚀 快速开始
+- 将“现有库存优先使用”作为推荐系统的硬约束，减少因遗忘或过期造成的食材浪费
+- 菜谱与采购清单联动，仅对“真正缺失”的食材给出补充建议，避免冲动式、重复式购买
 
-### 前置条件
+### 2. 提升决策效率与满意度
 
-- Node.js 18+
-- Python 3.11+
-- Supabase 账号
-- OpenAI API Key
+- 将口味偏好、饮食类型、最大烹饪时间、烹饪水平等因素结构化建模
+- 从“我绞尽脑汁想今天该吃什么”转变为“系统直接给我可行选项”，显著降低每日决策成本
 
-### 1. 克隆项目
+### 3. 健康与饮食合规
 
-```bash
-git clone <repository-url>
-cd what2eat
-```
+- 支持均衡饮食、爱吃肉、爱吃菜、低碳水等饮食类型
+- 为长期健康管理（如控糖、减脂、均衡饮食）提供可持续执行的技术基础
 
-### 2. 设置 Supabase
+### 4. 生态与商业合作潜力
 
-1. 创建新的 Supabase 项目
-2. 在 Supabase SQL Editor 中运行 `supabase/config/schema.sql`
-3. 获取项目 URL 和 anon key
+- 未来版本中可与商超、生鲜、电商平台对接，基于库存缺口生成精准且具体的采购建议，并同步执行AI一站式采购功能
+- 在用户匿名化前提下，形成食材使用趋势与菜谱偏好分析能力，为 B 端提供数据价值
 
-### 3. 设置后端
+## 三、AI 创新性
 
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-```
+### 1. 个性化多约束推荐机制
 
-创建 `.env` 文件：
+不同于单一口味或评分排序，What2Eat 的推荐逻辑同时考虑：
 
-```env
-SUPABASE_URL=your_supabase_project_url
-SUPABASE_KEY=your_supabase_anon_key
-OPENAI_API_KEY=your_openai_api_key
-```
+- 可用食材集合（硬约束）
+- 用户口味偏好（软约束）
+- 饮食类型（规则约束）
+- 最大烹饪时间与烹饪水平（可执行性约束）
 
-启动后端：
+从“好不好吃”升级为“我现在能不能做、愿不愿意做”，显著提升推荐的可执行性与用户满意度,避免"收藏从未停止,实践从未开始"的尴尬。
 
-```bash
-uvicorn main:app --reload
-```
+### 2. 从识别到行动的完整功能链路
 
-后端将在 `http://localhost:8000` 运行
+由AI进行图像识别，对用户冰箱内已有食材进行统计，大大减轻用户手动输入烦恼；由AI进行实时菜谱智能推荐，可根据用户多维度信息更有针对性地进行推荐，并给出食材缺口，相较用户手动搜索某一菜谱再自行比对，用户无需“大海捞针”，一触即达。
 
-API 文档：`http://localhost:8000/docs`
+项目并非孤立功能堆叠，而是形成清晰闭环：
 
-### 4. 设置前端
+> **冰箱识别 → 菜谱推荐 → 采购补全 → 烹饪引导**
 
-```bash
-cd frontend
-npm install
-```
+每一步都直接服务于下一步的可执行性，避免“推荐完就结束”的断层体验。
 
-创建 `.env` 文件：
+### 3. 前后端协同的轻缓存与分页策略
 
-```env
-VITE_API_URL=http://localhost:8000/api/v1
-VITE_SUPABASE_URL=your_supabase_project_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-```
+- 后端提供分页接口，避免一次性生成或拉取大量菜谱
+- 前端对分页结果进行缓存与清理控制，减少重复请求与生成成本
+- 在 AI 生成场景下有效平衡响应速度、成本与体验
 
-启动前端：
+### 4. 用户体验 Demo 模式下的鲁棒性设计
 
-```bash
-npm run dev
-```
+- 在 Supabase 不可用、未配置或网络受限情况下：
+  - 后端自动切换至StubClient，保障用户体验
+  - 核心接口可正常执行相应功能
+- 保证项目在评审、展示与快速部署场景中能正常体验
 
-前端将在 `http://localhost:5173` 运行
+## 四、技术实现说明
 
-## 📱 功能演示
+### 1. 前端技术栈
 
-### 首页
-- 查看食材库存
-- 快速扫描入口
-- 今日推荐菜谱
-- 即将过期提醒
+- **React + Vite**：快速构建与热更新
+- **Zustand**：轻量状态管理，覆盖用户、食材、菜谱、购物清单等核心状态
 
-### 扫描页面
-- 拍照识别食材
-- 上传图片识别
-- 手动添加/编辑食材
-- 保存到库存
+#### 页面结构
 
-### 菜谱页面
-- 智能推荐菜谱
-- 多维度筛选
-- 匹配度显示
-- 缺失食材提醒
+- 主页：智能推荐入口、核心状态卡片
+- 扫描页：AI图像识别冰箱内已有食材，进行食材库存管理
+- 菜谱页：智能菜谱推荐
+- 采购页：可交互采购清单
+- 我的页：用户信息、偏好设置、统计信息整合
 
-### 烹饪页面
-- 步骤引导
-- 语音控制
-- 计时器
-- 烹饪小贴士
+<img src="asset/recipepage.png" alt="Recipe Page" style="zoom: 33%;" />
 
-### 个人中心
-- 用户信息管理
-- 口味偏好设置
-- 饮食类型选择
-- 统计信息
+#### 偏好管理与接口封装
 
-## 🔧 配置说明
+- 用户偏好通过 `PUT` 请求以 JSON Body 形式提交
+- 前后端枚举字段（如 DietType、TastePreference）保持严格一致
 
-### Supabase 设置
+#### 细节体验优化
 
-1. 启用 Row Level Security (RLS)
-2. 设置合适的访问策略
-3. 配置实时订阅（可选）
+- 支持响应式布局
 
-### OpenAI 配置
+  <img src="asset/responsive.png" alt="Responsive" style="zoom:33%;" />
 
-本项目使用 GPT-4o 进行：
-- 食材图像识别
-- 菜谱智能推荐
-- 烹饪建议生成
+- 主页卡片 Hover 边框抖动问题：
 
-### 语音识别
+  - 使用 `border-2 border-transparent` 预占空间
+  - Hover 时仅改变颜色不改变宽度
 
-浏览器原生 Web Speech API 支持：
-- Chrome: 完整支持
-- Edge: 完整支持
-- Safari: 部分支持
-- Firefox: 需要手动启用
+- 动画统一使用过渡类与 `group-hover`，保证交互一致性
 
-## 🧪 测试
+### 2. 后端技术栈
 
-```bash
-# 后端测试
-cd backend
-pytest
+- **FastAPI**：高性能异步 API 框架
+- 路由模块化设计：
+  - `ingredients`
+  - `recipes`
+  - `users`
+  - `shopping`
+  - `recipe_pages`
+  - `cooking`
 
-# 前端测试
-cd frontend
-npm run test
+#### Supabase 客户端与 Demo 模式兜底
+
+- 启动时检测环境变量是否存在
+- 初始化失败或未配置时自动启用 StubClient
+- 所有数据库调用接口保持一致，避免业务代码分叉
+
+```python
+def get_supabase_client() -> Client:
+    global supabase
+    
+    if supabase is None:
+        if not SUPABASE_URL or not SUPABASE_KEY:
+            class _StubResult:
+                data = []
+            class _StubQuery:
+                def select(self, *args, **kwargs): return self
+                def insert(self, *args, **kwargs): return self
+                def update(self, *args, **kwargs): return self
+                def delete(self, *args, **kwargs): return self
+                def eq(self, *args, **kwargs): return self
+                def order(self, *args, **kwargs): return self
+                def limit(self, *args, **kwargs): return self
+                def execute(self): return _StubResult()
+            class _StubClient:
+                def table(self, name): return _StubQuery()
+            supabase = _StubClient()
+        else:
+            try:
+                supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+            except Exception as e:
+                print(f"Warning: Failed to initialize Supabase client: {e}")
+                print("Some features may not work without database connection.")
+                class _StubResult:
+                    data = []
+                class _StubQuery:
+                    def select(self, *args, **kwargs): return self
+                    def insert(self, *args, **kwargs): return self
+                    def update(self, *args, **kwargs): return self
+                    def delete(self, *args, **kwargs): return self
+                    def eq(self, *args, **kwargs): return self
+                    def order(self, *args, **kwargs): return self
+                    def limit(self, *args, **kwargs): return self
+                    def execute(self): return _StubResult()
+                class _StubClient:
+                    def table(self, name): return _StubQuery()
+                supabase = _StubClient()
+    
+    return supabase
 ```
 
-## 📦 构建
 
-```bash
-# 前端构建
-cd frontend
-npm run build
 
-# 后端使用 Gunicorn
-cd backend
-gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker
+#### 用户偏好接口设计
+
+- 使用枚举类型约束输入合法性
+- 动态构建更新字段，仅修改实际传入项
+- 保证接口安全性与可扩展性
+
+### 3. 运行与配置
+
+- 前端：`npm run dev`（默认 `5173`）
+- 后端：`uvicorn main:app --reload`（默认 `8000`）
+
+#### 环境变量
+
+- `backend/.env`
+  - `SUPABASE_URL`
+  - `SUPABASE_KEY`
+  - `MODELSCOPE_BASE_URL`
+  - `MODELSCOPE_API_KEY`
+  - `MODELSCOPE_VISION_MODEL`
+- `frontend/.env`
+  - `VITE_API_URL`
+  - `VITE_SUPABASE_URL`
+  - `VITE_SUPABASE_ANON_KEY`
+
+#### Demo 模式
+
+- 部分必要数据存储于localStorage
+- 未配置 Supabase 仍可完整体验主流程
+
+# 
+
+## 五、交互与设计
+
+### 整体流程
+
+What2Eat 的核心交互流程围绕「**识别 → 推荐 → 采购 → 烹饪**」四个环节展开，形成完整的饮食决策闭环：
+
+```
+┌───────────────────────────────────────────────────────────────────┐
+│                         What2Eat 整体流程                          │
+├───────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  ┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐      │
+│  │ 扫一扫   │────▶│ 智能    │────▶│ 采购    │────▶│ 烹饪     │      │
+│  │  冰箱   │     │ 推荐    │       │ 清单    │     │ 引导     │      │
+│  └─────────┘     └─────────┘     └─────────┘     └─────────┘      │
+│       │               │               │               │           │
+│       ▼               ▼               ▼               ▼           │
+│  ┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐      │
+│  │  AI     │     │  多约束 │      │  缺口   │      │  步骤   │      │
+│  │ 图像    │      │  菜谱   │     │  食材   │      │  引导   │       │
+│  │ 识别    │      │  生成   │     │ 一键    │      │  语音   │       │
+│  └─────────┘     └─────────┘     └─────────┘     └─────────┘      │
+│                                                                   │
+│  ┌───────────────────────────────────────────────────────────┐    │
+│  │                  用户偏好设置（全局约束）                     │    │
+│  │      口味偏好 · 饮食类型 · 最大烹饪时间 · 烹饪水平              │    │
+│  └───────────────────────────────────────────────────────────┘    │
+│                                                                   │
+└───────────────────────────────────────────────────────────────────┘
 ```
 
-## 🤝 贡献指南
+**流程说明**：
 
-1. Fork 本仓库
-2. 创建功能分支 (`git checkout -b feature/amazing-feature`)
-3. 提交更改 (`git commit -m 'Add amazing feature'`)
-4. 推送到分支 (`git push origin feature/amazing-feature`)
-5. 创建 Pull Request
+1. **扫一扫冰箱**：用户拍摄冰箱内部照片，AI 自动识别已有食材并建立库存
+2. **智能推荐**：基于库存食材 + 用户偏好，AI 生成个性化菜谱推荐（2荤2素1汤）
+3. **采购清单**：对比菜谱与库存，自动生成缺口食材清单，支持一键添加
+4. **烹饪引导**：进入菜谱详情后可启动烹饪模式，逐步引导完成烹饪
 
-## 📄 许可证
+### 主页入口卡片
 
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情
+<img src="asset/entry.png" alt="Entry" style="zoom: 33%;" />
 
-## 🙏 致谢
+- 扫一扫冰箱 / 智能推荐 / 个性化设置作为主要交互入口功能突出显示，食材库存、采购清单以摘要形式显示
+- 固定边框宽度 + 颜色变化 Hover，避免布局抖动
+- 清晰区分“行动入口”与“信息展示”
 
-- [Supabase](https://supabase.com/) - 开源 Firebase 替代方案
-- [OpenAI](https://openai.com/) - AI 能力支持
-- [TailwindCSS](https://tailwindcss.com/) - CSS 框架
-- [Lucide](https://lucide.dev/) - 图标库
-- [Zustand](https://zustand-demo.pmnd.rs/) - 状态管理
+### 主要功能页
 
-## 📞 联系方式
+#### 扫描页
 
-- 项目链接: [https://github.com/yourusername/what2eat](https://github.com/yourusername/what2eat)
-- 问题反馈: [Issues](https://github.com/yourusername/what2eat/issues)
+<img src="asset/scanningpage.png" alt="Scanning Page" style="zoom: 33%;" />
 
----
+扫描页是用户建立食材库存的核心入口，支持两种识别模式：
 
-Happy Cooking! 🍳✨
+**功能特性**：
+
+| 功能 | 说明 |
+|------|------|
+| **相机拍摄** | 调用设备摄像头，实时预览冰箱内部 |
+| **图片上传** | 支持从本地选择已有图片进行识别 |
+| **AI 识别** | 调用视觉模型自动识别图片中的食材 |
+| **手动添加** | 支持手动输入食材名称、数量、单位、分类 |
+| **库存管理** | 查看/编辑/删除已有食材，支持清空操作 |
+
+**交互流程**：
+
+```
+拍摄/上传图片 → AI分析识别 → 展示识别结果 → 用户确认/编辑 → 保存至库存
+                                    ↓
+                            支持手动添加遗漏食材
+```
+
+**识别结果展示**：
+
+<img src="asset/scanningresult.png" alt="Scanning Result" style="zoom: 33%;" />
+
+- 显示识别到的食材名称、建议数量、分类
+- 用户可调整数量或删除误识别项
+- 保存时自动同步至数据库，并提示是否重新推荐菜谱
+
+# 
+
+**库存视图**：
+
+<img src="asset/inventorypage.png" alt="Inventory Page" style="zoom: 33%;" />
+
+- 切换至「库存」标签查看所有已保存食材
+- 支持单个删除或一键清空
+- 食材变更后自动触发菜谱刷新提示
+
+#### 菜谱页
+
+<img src="asset/recipepage-2.png" alt="Recipe Page" style="zoom: 33%;" />
+
+菜谱页是核心推荐功能的展示界面，基于用户库存和偏好生成个性化菜谱。
+
+# 
+
+**推荐规则**：
+
+每页推荐 **5 道菜**，例如均衡饮食遵循「**2荤2素1汤**」的营养搭配原则：
+
+| 位置 | 类型 | 说明 |
+|------|------|------|
+| 第1-2道 | 荤菜 | 含肉类食材的主菜 |
+| 第3-4道 | 素菜 | 含蔬菜水果类的菜品 |
+| 第5道 | 汤品 | 各类汤羹 |
+
+**菜谱卡片信息**：
+
+<img src="asset/recipecard.png" alt="Recipe Card" style="zoom: 33%;" />
+
+# 
+
+**核心交互**：
+
+| 操作 | 功能 |
+|------|------|
+| **不合胃口？** | 重新生成新一页菜谱，保留历史页面 |
+| **排除食材** | 点击「不合胃口？」后可勾选不吃的食材 |
+| **分页导航** | 底部圆点指示器切换历史菜谱页 |
+| **清空菜谱** | 一键清除所有已生成的菜谱页 |
+| **查看详情** | 进入菜谱详情页，查看完整步骤 |
+| **开始烹饪** | 菜谱步骤放大显示，辅以倒计时功能 |
+
+<img src="asset/eliminatingwindow.png" alt="Eliminating Window" style="zoom: 50%;" />
+
+<img src="asset/cookingpage.png" alt="Cooking Page" style="zoom: 33%;" />
+
+# 
+
+**多页机制**：
+
+- 每次点击「不合胃口？」生成新的一页，不会覆盖已有菜谱
+- 菜谱数据持久化存储，刷新页面后自动加载历史记录
+- 支持多页浏览，通过底部指示器切换
+
+**匹配度计算**：
+
+```
+匹配度 = (已有食材数 / 菜谱所需食材数) × 100%
+```
+
+- 匹配度越高，表示用户越能直接开始烹饪
+- 缺少的食材会明确显示，支持一键添加至采购清单
+
+
+
+#### 采购页
+
+采购页管理用户待采购和已完成的食材清单，与菜谱推荐紧密联动。
+
+**页面结构**：
+
+<img src="asset/shoppingpage.png" alt="Shopping Page" style="zoom: 33%;" />
+
+**功能特性**：
+
+| 功能 | 说明 |
+|------|------|
+| **待采购/已完成** | 可切换查看不同状态的采购清单 |
+| **食材勾选** | 单个食材可标记为已购买（勾选状态） |
+| **全部完成** | 当菜谱所有食材都勾选后，弹窗确认移至已完成 |
+| **清空清单** | 一键清除所有采购记录 |
+| **菜谱关联** | 每个采购项关联对应菜谱名称 |
+
+
+
+**交互流程**：
+
+```
+菜谱页点击「添加至采购清单」
+           ↓
+    缺口食材自动添加
+           ↓
+用户采购时逐个勾选已买食材
+           ↓
+   全部勾选后弹窗确认
+           ↓
+    移至「已完成」标签
+           ↓
+  已完成项的食材状态锁定
+```
+
+**状态管理**：
+
+- **待采购**：食材未全部购买，可继续勾选/取消
+- **已完成**：所有食材已购买，状态锁定不可修改
+- 数据持久化存储，刷新页面后自动加载
+
+**与菜谱联动**：
+
+- 从菜谱详情页点击「添加至采购清单」自动添加缺口食材
+- 同一菜谱重复添加会覆盖而非重复
+- 采购清单在首页「我的采购清单」卡片中同步显示摘要
+
+
+
+### 个人页与偏好设置
+
+<img src="asset/profilepage-2.png" alt="Profile Page" style="zoom: 33%;" />
+
+- 个人信息、统计与设置统一纵向布局
+- 偏好拆分为四个独立弹窗：
+  - 口味偏好
+  - 饮食类型
+  - 最大烹饪时间
+  - 烹饪水平
+- 每张卡片只负责一个决策，降低认知负担
+
+### 错误处理与兜底体验
+
+- 数据库不可用时给出非阻塞提示
+- 偏好保存失败时：
+  - 前端本地立即更新
+  - 后端恢复后可重新同步
+- 优先保证“用户流程不断裂”
+
+## 六、落地与扩展
+
+### 数据安全与隐私
+
+- Demo 模式不存储任何用户数据于远程数据库中
+- 生产环境建议：
+  - 启用 Supabase RLS
+  - 使用 HTTPS
+  - 严格限制跨用户访问
+
+### 商业与产品扩展
+
+- 对接电商 / 生鲜平台 API
+- 一键采购、会员推荐、优惠匹配
+- 健康评分、营养摄入分析与长期目标管理
+
+### 技术演进方向
+
+- 引入 Embedding + 向量检索提升菜谱匹配质量
+- 规则模型 + LLM 组合，平衡可控性与生成多样性
+- 完善图像识别 pipeline，应对复杂冰箱场景
+

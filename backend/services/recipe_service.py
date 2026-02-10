@@ -13,9 +13,9 @@ from datetime import timezone
 load_dotenv()
 
 # ModelScope API 配置
-MODELSCOPE_BASE_URL = "https://api-inference.modelscope.cn/v1"
-MODELSCOPE_API_KEY = "ms-76b46a1c-253d-45c0-bccd-e91b31bbc460"
-MODELSCOPE_VISION_MODEL = "Qwen/Qwen3-VL-30B-A3B-Instruct"
+MODELSCOPE_BASE_URL = os.getenv("MODELSCOPE_BASE_URL", "https://api-inference.modelscope.cn/v1")
+MODELSCOPE_API_KEY = os.getenv("MODELSCOPE_API_KEY", "")
+MODELSCOPE_VISION_MODEL = os.getenv("MODELSCOPE_VISION_MODEL", "Qwen/Qwen3-VL-30B-A3B-Instruct")
 
 CACHE_DURATION_HOURS = int(os.getenv("RECIPE_CACHE_HOURS", "24"))
 _RECIPES_MEMORY: dict = {}

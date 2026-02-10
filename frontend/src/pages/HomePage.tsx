@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Scan, Utensils, ChefHat, ArrowRight, Sparkles, Plus, X, ShoppingCart, Check, RefreshCw, Trash2 } from 'lucide-react';
 import { useIngredientsStore, useRecipesStore } from '../stores';
 import { ingredientApi, recipeApi } from '../services/api';
@@ -7,7 +7,8 @@ import type { Ingredient } from '../types';
 import { getUserId } from '../utils/userId';
 
 export default function HomePage() {
-  const { ingredients, addIngredient, setIngredients, removeIngredient, clearIngredients } = useIngredientsStore();
+  const navigate = useNavigate();
+  const { ingredients, addIngredient, removeIngredient, clearIngredients } = useIngredientsStore();
   const { recommendations, recipePages, loadFromDatabase, clearRecommendations } = useRecipesStore();
   const [showAddForm, setShowAddForm] = useState(false);
   const [newIngredient, setNewIngredient] = useState({ name: '', quantity: 1, unit: '个', category: 'other' });
@@ -62,7 +63,7 @@ export default function HomePage() {
     try {
       const saved = await ingredientApi.addIngredient(newIngredient as Partial<Ingredient>, getUserId());
       addIngredient(saved);
-      setNewIngredient({ name: '', quantity: 1, unit: '个' });
+      setNewIngredient({ name: '', quantity: 1, unit: '个', category: 'other' });
       setShowAddForm(false);
       setShowRecipeRefreshDialog(true);
     } catch (err) {
@@ -87,11 +88,11 @@ export default function HomePage() {
 
   return (
     <div className="space-y-8 animate-fade-in">
-      <section className="text-center py-8">
-        <h1 className="text-4xl font-bold text-gray-800 mb-3">
+      <section className="text-center py-6 md:py-8">
+        <h1 className="text-2xl md:text-4xl font-bold text-gray-800 mb-2 md:mb-3">
           今天吃什么 🍽️
         </h1>
-        <p className="text-gray-600 text-lg max-w-2xl mx-auto">
+        <p className="text-gray-600 text-sm md:text-lg max-w-2xl mx-auto px-4">
           告别选择困难症，让AI帮你决定今天的美味！
           <br />
           <span className="text-primary-600 font-medium">扫一扫冰箱，美味即刻呈现</span>
@@ -101,75 +102,83 @@ export default function HomePage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Link
           to="/scanner"
-          className="card p-8 group border-2 border-transparent hover:border-primary-500 min-h-[160px] flex items-center"
+          className="card p-6 md:p-8 group border-2 border-transparent hover:border-primary-500 min-h-[140px] md:min-h-[160px] flex items-center"
         >
-          <div className="flex items-center space-x-6 w-full">
-            <div className="w-32 h-32 bg-primary-100 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Scan size={72} className="text-primary-600" />
+          <div className="flex items-center space-x-4 md:space-x-6 w-full">
+            <div className="w-20 h-20 md:w-32 md:h-32 bg-primary-100 rounded-xl md:rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform flex-shrink-0">
+              <Scan size={48} className="text-primary-600 md:hidden" />
+              <Scan size={72} className="text-primary-600 hidden md:block" />
             </div>
-            <div className="flex-1">
-              <h3 className="text-2xl font-semibold text-gray-800">扫一扫冰箱</h3>
-              <p className="text-gray-500 text-base mt-2">AI识别食材，智能管理库存</p>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-lg md:text-2xl font-semibold text-gray-800">扫一扫冰箱</h3>
+              <p className="text-gray-500 text-sm md:text-base mt-1 md:mt-2">AI识别食材，智能管理库存</p>
             </div>
           </div>
-          <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform ml-auto">
-            <ArrowRight size={24} className="text-gray-400 group-hover:text-primary-600 transition-colors" />
+          <div className="w-10 h-10 md:w-12 md:h-12 bg-gray-100 rounded-lg md:rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform ml-auto flex-shrink-0">
+            <ArrowRight size={20} className="text-gray-400 group-hover:text-primary-600 transition-colors md:hidden" />
+            <ArrowRight size={24} className="text-gray-400 group-hover:text-primary-600 transition-colors hidden md:block" />
           </div>
         </Link>
 
         <div className="flex flex-col gap-6">
           <Link
             to="/recipes"
-            className="card p-6 group border-2 border-transparent hover:border-accent-500"
+            className="card p-4 md:p-6 group border-2 border-transparent hover:border-accent-500"
           >
-            <div className="flex items-center space-x-4">
-              <div className="w-16 h-16 bg-accent-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Utensils size={32} className="text-accent-600" />
+            <div className="flex items-center space-x-3 md:space-x-4">
+              <div className="w-12 h-12 md:w-16 md:h-16 bg-accent-100 rounded-lg md:rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform flex-shrink-0">
+                <Utensils size={24} className="text-accent-600 md:hidden" />
+                <Utensils size={32} className="text-accent-600 hidden md:block" />
               </div>
-              <div className="flex-1">
-                <h3 className="text-xl font-semibold text-gray-800">智能推荐</h3>
-                <p className="text-gray-500 text-sm mt-1">根据食材推荐美味菜谱</p>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base md:text-xl font-semibold text-gray-800">智能推荐</h3>
+                <p className="text-gray-500 text-xs md:text-sm mt-0.5 md:mt-1">根据食材推荐美味菜谱</p>
               </div>
-              <ArrowRight size={20} className="text-gray-400 group-hover:text-accent-600 transition-colors" />
+              <ArrowRight size={18} className="text-gray-400 group-hover:text-accent-600 transition-colors md:hidden flex-shrink-0" />
+              <ArrowRight size={20} className="text-gray-400 group-hover:text-accent-600 transition-colors hidden md:block flex-shrink-0" />
             </div>
           </Link>
 
           <Link
             to="/profile"
-            className="card p-6 group border-2 border-transparent hover:border-purple-500"
+            className="card p-4 md:p-6 group border-2 border-transparent hover:border-purple-500"
           >
-            <div className="flex items-center space-x-4">
-              <div className="w-16 h-16 bg-purple-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Sparkles size={32} className="text-purple-600" />
+            <div className="flex items-center space-x-3 md:space-x-4">
+              <div className="w-12 h-12 md:w-16 md:h-16 bg-purple-100 rounded-lg md:rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform flex-shrink-0">
+                <Sparkles size={24} className="text-purple-600 md:hidden" />
+                <Sparkles size={32} className="text-purple-600 hidden md:block" />
               </div>
-              <div className="flex-1">
-                <h3 className="text-xl font-semibold text-gray-800">个性化设置</h3>
-                <p className="text-gray-500 text-sm mt-1">定制你的口味偏好</p>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base md:text-xl font-semibold text-gray-800">个性化设置</h3>
+                <p className="text-gray-500 text-xs md:text-sm mt-0.5 md:mt-1">定制你的口味偏好</p>
               </div>
-              <ArrowRight size={20} className="text-gray-400 group-hover:text-purple-600 transition-colors" />
+              <ArrowRight size={18} className="text-gray-400 group-hover:text-purple-600 transition-colors md:hidden flex-shrink-0" />
+              <ArrowRight size={20} className="text-gray-400 group-hover:text-purple-600 transition-colors hidden md:block flex-shrink-0" />
             </div>
           </Link>
         </div>
       </div>
 
       {hasIngredients && (
-        <section className="card p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-800">我的食材库存</h2>
+        <section className="card p-4 md:p-6">
+          <div className="flex items-center justify-between mb-3 md:mb-4">
+            <h2 className="text-base md:text-xl font-semibold text-gray-800">我的食材库存</h2>
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => setShowClearConfirmDialog(true)}
                 disabled={ingredients.length === 0}
-                className="flex items-center space-x-1 px-2 py-1.5 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center space-x-1 px-2 py-1 md:py-1.5 bg-red-500 text-white text-xs md:text-sm rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Trash2 size={14} />
+                <Trash2 size={12} className="md:hidden" />
+                <Trash2 size={14} className="hidden md:block" />
                 <span>清空</span>
               </button>
               <button
                 onClick={() => setShowAddForm(true)}
-                className="flex items-center space-x-1 px-3 py-1.5 bg-primary-500 text-white text-sm rounded-lg hover:bg-primary-600 transition-colors"
+                className="flex items-center space-x-1 px-2 py-1 md:px-3 md:py-1.5 bg-primary-500 text-white text-xs md:text-sm rounded-lg hover:bg-primary-600 transition-colors"
               >
-                <Plus size={14} />
+                <Plus size={12} className="md:hidden" />
+                <Plus size={14} className="hidden md:block" />
                 <span>手动添加</span>
               </button>
             </div>
@@ -284,7 +293,7 @@ export default function HomePage() {
 
           <section className="mt-8">
             <Link to="/shopping" className="flex items-center justify-between group">
-              <h2 className="text-xl font-semibold text-gray-800 group-hover:text-primary-600 transition-colors">我的采购清单</h2>
+              <h2 className="text-lg md:text-xl font-semibold text-gray-800 group-hover:text-primary-600 transition-colors">我的采购清单</h2>
               <span className="text-primary-600 text-sm opacity-0 group-hover:opacity-100 transition-opacity">进入 →</span>
             </Link>
             
@@ -355,8 +364,8 @@ export default function HomePage() {
       )}
 
       <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="card p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-3">💡 使用技巧</h3>
+        <div className="card p-5 md:p-6">
+          <h3 className="text-base md:text-lg font-semibold text-gray-800 mb-3">💡 使用技巧</h3>
           <ul className="space-y-2 text-gray-600 text-sm">
             <li className="flex items-start space-x-2">
               <span className="text-primary-600">•</span>
@@ -373,8 +382,8 @@ export default function HomePage() {
           </ul>
         </div>
 
-        <div className="card p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-3">🎯 今日统计</h3>
+        <div className="card p-5 md:p-6">
+          <h3 className="text-base md:text-lg font-semibold text-gray-800 mb-3">🎯 今日统计</h3>
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
               <div className="text-2xl font-bold text-primary-600">{ingredients.length}</div>
@@ -403,8 +412,8 @@ export default function HomePage() {
               <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <RefreshCw size={32} className="text-primary-600" />
               </div>
-              <h3 className="text-xl font-bold text-gray-800 mb-2">食材已更改</h3>
-              <p className="text-gray-600">
+              <h3 className="text-lg md:text-xl font-bold text-gray-800 mb-2">食材已更改</h3>
+              <p className="text-sm md:text-base text-gray-600">
                 您的食材库存已更新，是否要重新生成菜谱推荐？
               </p>
             </div>
@@ -419,7 +428,7 @@ export default function HomePage() {
                 onClick={() => {
                   setShowRecipeRefreshDialog(false);
                   sessionStorage.setItem('forceRefreshRecipes', 'true');
-                  window.location.href = '/recipes';
+                  navigate('/recipes');
                 }}
                 className="flex-1 px-6 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors"
               >

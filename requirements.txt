@@ -1,0 +1,18 @@
+# FastAPI Backend for What2Eat (ModelScope)
+fastapi==0.109.0
+uvicorn==0.27.0
+python-multipart==0.0.6
+python-dotenv==1.0.0
+pydantic>=2.11.7,<3
+tenacity==8.2.3
+
+# Supabase client and compatibility pins to avoid proxy arg error
+httpx==0.27.2
+supabase==2.27.3
+gotrue==2.9.1
+
+# Optional: OpenAI client for AI features
+openai>=1.0.0
+
+# Image processing
+Pillow==10.2.0

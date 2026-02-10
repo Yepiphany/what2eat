@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Camera, Upload, X, RefreshCw, Check, AlertTriangle, Plus, List, Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useIngredientsStore, useRecipesStore } from '../stores';
 import { ingredientApi } from '../services/api';
 import type { Ingredient } from '../types';
@@ -7,9 +8,9 @@ import { incrementScannedIngredients } from './ProfilePage';
 import { getUserId } from '../utils/userId';
 
 export default function ScannerPage() {
+  const navigate = useNavigate();
   const [mode, setMode] = useState<'camera' | 'upload'>('camera');
   const [viewMode, setViewMode] = useState<'scan' | 'inventory'>('scan');
-  const [isScanning, setIsScanning] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -124,7 +125,6 @@ export default function ScannerPage() {
         ctx.drawImage(videoRef.current, 0, 0);
         const imageUrl = canvas.toDataURL('image/jpeg', 0.8);
         setPreviewUrl(imageUrl);
-        setIsScanning(true);
         analyzeImage(imageUrl);
       }
     }
@@ -137,7 +137,6 @@ export default function ScannerPage() {
       reader.onload = (e) => {
         const imageUrl = e.target?.result as string;
         setPreviewUrl(imageUrl);
-        setIsScanning(true);
         analyzeImage(imageUrl);
       };
       reader.readAsDataURL(file);
@@ -149,20 +148,7 @@ export default function ScannerPage() {
     setError(null);
     
     try {
-      const base64Data = imageBase64.split(',')[1];
-      const response = await fetch('http://localhost:8000/api/v1/ingredients/scan-base64', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ image: base64Data }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('分析失败，请重试');
-      }
-      
-      const data = await response.json();
+      const data = await ingredientApi.scanImageBase64(imageBase64);
       setDetectedIngredients(data);
     } catch (err) {
       console.error('Analysis error:', err);
@@ -177,14 +163,12 @@ export default function ScannerPage() {
       ]);
     } finally {
       setIsAnalyzing(false);
-      setIsScanning(false);
     }
   };
 
   const resetScanner = () => {
     setPreviewUrl(null);
     setDetectedIngredients([]);
-    setIsScanning(false);
     setError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -270,19 +254,6 @@ export default function ScannerPage() {
     other: 'bg-gray-100 text-gray-600',
   };
 
-  const categoryLabels: Record<string, string> = {
-    vegetable: '蔬菜',
-    meat: '肉类',
-    seafood: '海鲜',
-    dairy: '乳制品',
-    egg: '蛋类',
-    grain: '谷物',
-    fruit: '水果',
-    seasoning: '调料',
-    beverage: '饮品',
-    other: '其他',
-  };
-
   const categoryOptions = [
     { value: 'vegetable', label: '蔬菜' },
     { value: 'meat', label: '肉类' },
@@ -299,52 +270,52 @@ export default function ScannerPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       <header className="text-center">
-        <h1 className="text-3xl font-bold text-gray-800">
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
           {viewMode === 'inventory' ? '📦 我的食材库存' : '📸 扫一扫冰箱'}
         </h1>
-        <p className="text-gray-500 mt-2">
+        <p className="text-sm md:text-base text-gray-500 mt-2 px-4">
           {viewMode === 'inventory' ? '管理您的食材库存' : 'AI智能识别食材，管理你的饮食库存'}
         </p>
       </header>
 
-      <div className="flex justify-center space-x-4">
+      <div className="flex flex-wrap justify-center gap-3 px-4">
         {viewMode === 'inventory' ? (
           <button
             onClick={() => { setViewMode('scan'); resetScanner(); }}
-            className="flex items-center space-x-2 px-6 py-3 rounded-full font-medium bg-primary-500 text-white shadow-lg"
+            className="flex items-center space-x-2 px-5 md:px-6 py-2.5 md:py-3 rounded-full text-sm md:text-base font-medium bg-primary-500 text-white shadow-lg"
           >
-            <Camera size={20} />
+            <Camera size={18} />
             <span>返回扫描</span>
           </button>
         ) : (
           <>
             <button
               onClick={() => setMode('camera')}
-              className={`flex items-center space-x-2 px-6 py-3 rounded-full font-medium transition-all ${
+              className={`flex items-center space-x-2 px-5 md:px-6 py-2.5 md:py-3 rounded-full text-sm md:text-base font-medium transition-all ${
                 mode === 'camera'
                   ? 'bg-primary-500 text-white shadow-lg'
                   : 'bg-white text-gray-600 hover:bg-gray-50'
               }`}
             >
-              <Camera size={20} />
+              <Camera size={18} />
               <span>拍照识别</span>
             </button>
             <button
               onClick={() => setMode('upload')}
-              className={`flex items-center space-x-2 px-6 py-3 rounded-full font-medium transition-all ${
+              className={`flex items-center space-x-2 px-5 md:px-6 py-2.5 md:py-3 rounded-full text-sm md:text-base font-medium transition-all ${
                 mode === 'upload'
                   ? 'bg-primary-500 text-white shadow-lg'
                   : 'bg-white text-gray-600 hover:bg-gray-50'
               }`}
             >
-              <Upload size={20} />
+              <Upload size={18} />
               <span>上传照片</span>
             </button>
             <button
               onClick={() => setViewMode('inventory')}
-              className="flex items-center space-x-2 px-6 py-3 rounded-full font-medium bg-accent-500 text-white shadow-lg"
+              className="flex items-center space-x-2 px-5 md:px-6 py-2.5 md:py-3 rounded-full text-sm md:text-base font-medium bg-accent-500 text-white shadow-lg"
             >
-              <List size={20} />
+              <List size={18} />
               <span>查看库存</span>
             </button>
           </>
@@ -359,23 +330,23 @@ export default function ScannerPage() {
       )}
 
       {viewMode === 'inventory' ? (
-        <div className="card p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-800">
+        <div className="card p-4 md:p-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 space-y-3 md:space-y-0">
+            <h3 className="text-base md:text-lg font-semibold text-gray-800">
               全部食材 ({ingredients.length} 种)
             </h3>
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => setShowClearConfirmDialog(true)}
                 disabled={ingredients.length === 0}
-                className="flex items-center space-x-1 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center space-x-1 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base"
               >
                 <Trash2 size={16} />
                 <span>清空</span>
               </button>
               <button
                 onClick={() => setShowAddForm(true)}
-                className="flex items-center space-x-1 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
+                className="flex items-center space-x-1 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors text-sm md:text-base"
               >
                 <Plus size={18} />
                 <span>手动添加</span>
@@ -478,8 +449,8 @@ export default function ScannerPage() {
                       {ing.category || '未知'}
                     </div>
                     <div>
-                      <div className="font-medium text-gray-800">{ing.name}</div>
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm md:text-base font-medium text-gray-800">{ing.name}</div>
+                      <div className="text-[10px] md:text-sm text-gray-500">
                         {ing.quantity}{ing.unit} · {ing.expiry_date ? `保质期至 ${new Date(ing.expiry_date).toLocaleDateString()}` : '无保质期'}
                       </div>
                     </div>
@@ -506,18 +477,18 @@ export default function ScannerPage() {
             
             {isAnalyzing && (
               <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                <div className="text-center text-white">
-                  <RefreshCw size={48} className="animate-spin mx-auto mb-4" />
-                  <p className="text-lg font-medium">AI正在识别食材...</p>
+                <div className="text-center text-white p-4">
+                  <RefreshCw size={40} className="animate-spin mx-auto mb-3 md:mb-4" />
+                  <p className="text-base md:text-lg font-medium">AI正在识别食材...</p>
                 </div>
               </div>
             )}
             
             {isSaving && !isAnalyzing && (
               <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                <div className="text-center text-white">
-                  <RefreshCw size={48} className="animate-spin mx-auto mb-4" />
-                  <p className="text-lg font-medium">正在将食材加入库存...</p>
+                <div className="text-center text-white p-4">
+                  <RefreshCw size={40} className="animate-spin mx-auto mb-3 md:mb-4" />
+                  <p className="text-base md:text-lg font-medium">正在将食材加入库存...</p>
                 </div>
               </div>
             )}
@@ -712,7 +683,7 @@ export default function ScannerPage() {
                 onClick={() => {
                   setShowRecipeRefreshDialog(false);
                   sessionStorage.setItem('forceRefreshRecipes', 'true');
-                  window.location.href = '/recipes';
+                  navigate('/recipes');
                 }}
                 className="flex-1 px-6 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors"
               >

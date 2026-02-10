@@ -1,9 +1,11 @@
 from typing import List, Dict, Optional
 from datetime import datetime
+import uuid
 from models.database import get_supabase_client
 from models.cooking_schemas import (
     CookingStep, CookingSessionStatus, CookingSessionResponse
 )
+from services.recipe_service import get_recipe_from_database
 
 supabase = get_supabase_client()
 
@@ -100,21 +102,34 @@ SAMPLE_COOKING_STEPS = {
 
 async def create_session(recipe_id: str, user_id: str) -> CookingSessionResponse:
     try:
-        recipe_result = supabase.table("recipes").select("*").eq("id", recipe_id).execute()
+        # 1. 优先尝试从数据库或内存获取完整菜谱信息
+        recipe = get_recipe_from_database(recipe_id)
         
-        steps = SAMPLE_COOKING_STEPS.get(recipe_id, [])
+        steps = []
+        recipe_title = "自定义菜谱"
         
-        if not steps and recipe_result.data:
-            recipe = recipe_result.data[0]
-            steps = [
-                CookingStep(
-                    step_number=i+1,
-                    instruction=step,
-                    duration_seconds=300
-                )
-                for i, step in enumerate(recipe.get("steps", []))
-            ]
+        # 2. 如果找到了菜谱，提取其步骤
+        if recipe:
+            recipe_title = recipe.get("title", "未知菜谱")
+            recipe_steps = recipe.get("steps", [])
+            if recipe_steps:
+                steps = [
+                    CookingStep(
+                        step_number=i+1,
+                        instruction=step,
+                        duration_seconds=300 # 默认5分钟
+                    )
+                    for i, step in enumerate(recipe_steps)
+                ]
         
+        # 3. 如果没找到菜谱或没有步骤，再尝试示例菜谱
+        if not steps:
+            sample_steps_data = SAMPLE_COOKING_STEPS.get(recipe_id)
+            if sample_steps_data:
+                steps = [CookingStep(**s) for s in sample_steps_data]
+                recipe_title = "示例菜谱"
+        
+        # 4. 最后兜底方案
         if not steps:
             steps = [
                 CookingStep(
@@ -130,7 +145,7 @@ async def create_session(recipe_id: str, user_id: str) -> CookingSessionResponse
             "current_step": 0,
             "status": CookingSessionStatus.NOT_STARTED.value,
             "steps": [s.model_dump() for s in steps],
-            "recipe_title": recipe_result.data[0].get("title", "未知菜谱") if recipe_result.data else "自定义菜谱"
+            "recipe_title": recipe_title
         }
         
         result = supabase.table("cooking_sessions").insert(session_data).execute()
@@ -156,9 +171,35 @@ async def create_session(recipe_id: str, user_id: str) -> CookingSessionResponse
     except Exception as e:
         print(f"Create session error: {e}")
         
-        steps = SAMPLE_COOKING_STEPS.get(recipe_id, [])
+        # 即使报错，也尝试通过 get_recipe_from_database 获取
+        recipe = get_recipe_from_database(recipe_id)
+        recipe_title = recipe.get("title", "示例菜谱") if recipe else "示例菜谱"
+        recipe_steps = recipe.get("steps", []) if recipe else []
+        
+        if recipe_steps:
+            steps = [
+                CookingStep(
+                    step_number=i+1,
+                    instruction=step,
+                    duration_seconds=300
+                )
+                for i, step in enumerate(recipe_steps)
+            ]
+        else:
+            sample_steps_data = SAMPLE_COOKING_STEPS.get(recipe_id, [])
+            if sample_steps_data:
+                steps = [CookingStep(**s) for s in sample_steps_data]
+            else:
+                steps = [
+                    CookingStep(
+                        step_number=1,
+                        instruction="按照菜谱步骤进行烹饪",
+                        duration_seconds=None
+                    )
+                ]
+
         return CookingSessionResponse(
-            id="temp_session",
+            id="temp_session_" + str(uuid.uuid4())[:8],
             recipe_id=recipe_id,
             user_id=user_id,
             current_step=0,
@@ -166,7 +207,7 @@ async def create_session(recipe_id: str, user_id: str) -> CookingSessionResponse
             started_at=None,
             completed_at=None,
             steps=steps,
-            recipe_title="示例菜谱"
+            recipe_title=recipe_title
         )
 
 async def get_session(session_id: str, user_id: str) -> Optional[CookingSessionResponse]:

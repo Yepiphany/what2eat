@@ -1,6 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
 import { Home, Scan, Utensils, User, ShoppingCart } from 'lucide-react';
-import { useAppStore } from '../stores';
 
 const navItems = [
   { path: '/', icon: Home, label: '首页' },
@@ -12,7 +11,6 @@ const navItems = [
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
-  const { activeView, setActiveView } = useAppStore();
 
   const getActiveView = () => {
     const path = location.pathname;

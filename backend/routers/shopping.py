@@ -36,7 +36,7 @@ class ShoppingListCreate(BaseModel):
     items: List[str]
     recipe_title: Optional[str] = None
 
-@router.post("/shopping-list")
+@router.post("")
 async def create_shopping_list(request: ShoppingListCreate, user_id: str):
     try:
         ensure_user_exists(user_id)
@@ -64,7 +64,7 @@ async def create_shopping_list(request: ShoppingListCreate, user_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/shopping-list")
+@router.get("")
 async def get_shopping_lists(user_id: str, status: Optional[str] = Query(default=None)):
     try:
         supabase = get_supabase_client()
@@ -93,7 +93,7 @@ async def get_shopping_lists(user_id: str, status: Optional[str] = Query(default
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.delete("/shopping-list/{item_id}")
+@router.delete("/{item_id}")
 async def delete_shopping_list(item_id: str, user_id: str):
     try:
         supabase = get_supabase_client()
@@ -108,7 +108,7 @@ async def delete_shopping_list(item_id: str, user_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.put("/shopping-list/{item_id}/complete")
+@router.put("/{item_id}/complete")
 async def complete_shopping_list(item_id: str, user_id: str):
     try:
         supabase = get_supabase_client()
@@ -123,7 +123,7 @@ async def complete_shopping_list(item_id: str, user_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/shopping-list/{item_id}/toggle-item")
+@router.post("/{item_id}/toggle-item")
 async def toggle_shopping_list_item(item_id: str, user_id: str, item_index: int = Query(...)):
     try:
         supabase = get_supabase_client()
@@ -152,7 +152,7 @@ async def toggle_shopping_list_item(item_id: str, user_id: str, item_index: int 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.delete("/shopping-list/")
+@router.delete("")
 async def clear_all_shopping_lists(user_id: str):
     try:
         supabase = get_supabase_client()
