@@ -20,6 +20,37 @@ MODELSCOPE_VISION_MODEL = os.getenv("MODELSCOPE_VISION_MODEL", "Qwen/Qwen3-VL-30
 CACHE_DURATION_HOURS = int(os.getenv("RECIPE_CACHE_HOURS", "24"))
 _RECIPES_MEMORY: dict = {}
 
+# 常见调味品缺失默认不提示，避免影响推荐体验。
+COMMON_SEASONING_KEYWORDS = [
+    "盐", "食盐", "糖", "白糖", "冰糖", "酱油", "生抽", "老抽", "料酒", "米酒", "黄酒",
+    "醋", "陈醋", "白醋", "香醋", "蚝油", "鸡精", "味精", "胡椒", "白胡椒", "黑胡椒粉",
+    "淀粉", "生粉", "玉米淀粉", "油", "食用油", "花生油", "菜籽油", "橄榄油", "香油",
+    "葱", "姜", "蒜", "葱花", "姜末", "蒜末", "十三香"
+]
+
+# 这些调味品通常代表菜品风味特征，缺失时应提示。
+SIGNATURE_SEASONING_KEYWORDS = [
+    "豆瓣酱", "郫县豆瓣", "豆豉", "剁椒", "泡椒", "干辣椒", "花椒", "麻椒",
+    "孜然", "咖喱", "番茄酱", "黑椒酱", "照烧汁", "沙茶酱", "甜面酱", "黄豆酱",
+    "韩式辣酱", "鱼露", "冬阴功", "芥末"
+]
+
+# 根据菜名识别“特色调味品”的弱规则。
+TITLE_SIGNATURE_HINTS = {
+    "麻婆": ["豆瓣酱", "豆豉", "花椒"],
+    "鱼香": ["豆瓣酱", "泡椒", "醋"],
+    "宫保": ["花椒", "干辣椒"],
+    "咖喱": ["咖喱"],
+    "孜然": ["孜然"],
+    "黑椒": ["黑椒酱", "黑胡椒"],
+    "沙茶": ["沙茶酱"],
+    "照烧": ["照烧汁"],
+    "韩式": ["韩式辣酱"],
+    "泰式": ["鱼露", "冬阴功"],
+    "蒜蓉": ["蒜蓉", "蒜"],
+    "椒盐": ["椒盐"],
+}
+
 def generate_recipe_id() -> str:
     return str(uuid.uuid4())
 
@@ -32,8 +63,35 @@ def generate_ingredients_hash(ingredients: List[str], taste_preferences: Optiona
     key_str = json.dumps(key_data, sort_keys=True)
     return hashlib.md5(key_str.encode()).hexdigest()
 
+
+def _normalize_text(text: str) -> str:
+    return re.sub(r"\s+", "", (text or "")).lower()
+
+
+def _contains_any_keyword(text: str, keywords: List[str]) -> bool:
+    normalized = _normalize_text(text)
+    return any(_normalize_text(keyword) in normalized for keyword in keywords)
+
+
+def _is_signature_seasoning(ingredient: str, recipe_title: str) -> bool:
+    if _contains_any_keyword(ingredient, SIGNATURE_SEASONING_KEYWORDS):
+        return True
+
+    for title_hint, seasoning_hints in TITLE_SIGNATURE_HINTS.items():
+        if _normalize_text(title_hint) in _normalize_text(recipe_title):
+            if _contains_any_keyword(ingredient, seasoning_hints):
+                return True
+    return False
+
+
+def _should_ignore_missing_ingredient(ingredient: str, recipe_title: str) -> bool:
+    if not _contains_any_keyword(ingredient, COMMON_SEASONING_KEYWORDS):
+        return False
+    return not _is_signature_seasoning(ingredient, recipe_title)
+
 def enhance_recipe_with_matching(recipe: Dict, available_ingredients: List[str]) -> Dict:
     available_lower = [i.lower().strip() for i in available_ingredients]
+    recipe_title = recipe.get("title", "")
     recipe_ingredients = recipe.get("ingredients", [])
     recipe_ingredients_lower = [i.lower().strip() for i in recipe_ingredients]
     
@@ -41,6 +99,9 @@ def enhance_recipe_with_matching(recipe: Dict, available_ingredients: List[str])
     missing = []
     
     for i, ing in enumerate(recipe_ingredients):
+        if _should_ignore_missing_ingredient(ing, recipe_title):
+            continue
+
         ing_lower = recipe_ingredients_lower[i]
         is_matched = False
         
@@ -57,7 +118,12 @@ def enhance_recipe_with_matching(recipe: Dict, available_ingredients: List[str])
         else:
             missing.append(ing)
     
-    match_percentage = round(len(matched) / len(recipe_ingredients) * 100, 1) if recipe_ingredients else 0
+    considered_ingredients_count = len(matched) + len(missing)
+    match_percentage = (
+        round(len(matched) / considered_ingredients_count * 100, 1)
+        if considered_ingredients_count
+        else 100.0
+    )
     
     recipe["matched_ingredients"] = matched
     recipe["missing_ingredients"] = missing
@@ -258,6 +324,7 @@ async def get_ai_batch_recipes(
 3. 素菜禁止包含任何肉类食材
 4. 根据用户的饮食偏好调整菜谱结构
 5. taste_tags 必须使用中文，可选值：辣、甜、酸、咸、鲜、清淡、苦
+6. missing_ingredients 中忽略常见调味品（如盐、糖、生抽、料酒、葱姜蒜等）；仅在缺少菜品特色调味品时提示（如豆瓣酱、咖喱、孜然、沙茶酱等）
 
 严格按照JSON数组格式返回：
 

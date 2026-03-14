@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Camera, X, RefreshCw, Check, AlertTriangle, Plus, List, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Camera, X, RefreshCw, Check, AlertTriangle, Plus, List, Trash2, ChevronDown, ChevronUp, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useIngredientsStore, useRecipesStore } from '../stores';
 import { ingredientApi } from '../services/api';
@@ -52,6 +52,27 @@ export default function ScannerPage() {
       loadAllIngredients();
     }
   }, [viewMode]);
+
+  useEffect(() => {
+    if (viewMode !== 'scan' || previewUrl) {
+      return;
+    }
+
+    const hasLiveVideoTrack =
+      !!cameraStream && cameraStream.getVideoTracks().some((track) => track.readyState === 'live');
+
+    if (videoRef.current && hasLiveVideoTrack && videoRef.current.srcObject !== cameraStream) {
+      videoRef.current.srcObject = cameraStream;
+      videoRef.current.play().catch(() => {
+        // Ignore autoplay errors; user interaction (capture/reset) usually resumes playback.
+      });
+      return;
+    }
+
+    if (!hasLiveVideoTrack) {
+      startCamera();
+    }
+  }, [viewMode, previewUrl, cameraStream]);
 
   useEffect(() => {
     const prevBodyOverflow = document.body.style.overflow;
@@ -308,7 +329,6 @@ export default function ScannerPage() {
         setIngredients(allIngredients);
         incrementScannedIngredients(savedIngredients.length);
         setShowRecipeRefreshDialog(true);
-        setTimeout(() => resetScanner(), 100);
       } else {
         setError('保存失败，请重试');
       }
@@ -577,7 +597,7 @@ export default function ScannerPage() {
                 onClick={resetScanner}
                 className="w-10 h-10 rounded-full bg-black/55 text-white flex items-center justify-center backdrop-blur hover:bg-black/70 transition-colors"
               >
-                <X size={20} />
+                <ArrowLeft size={20} />
               </button>
             </div>
             
