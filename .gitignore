@@ -17,3 +17,9 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# Python virtual environments (repo root)
+.venv/
+venv/
+env/
+ENV/

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Camera, Upload, X, RefreshCw, Check, AlertTriangle, Plus, List, Trash2 } from 'lucide-react';
+import { Camera, X, RefreshCw, Check, AlertTriangle, Plus, List, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useIngredientsStore, useRecipesStore } from '../stores';
 import { ingredientApi } from '../services/api';
@@ -9,7 +9,8 @@ import { getUserId } from '../utils/userId';
 
 export default function ScannerPage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<'camera' | 'upload'>('camera');
+  const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
   const [viewMode, setViewMode] = useState<'scan' | 'inventory'>('scan');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -22,29 +23,101 @@ export default function ScannerPage() {
   const [isAdding, setIsAdding] = useState(false);
   const [showRecipeRefreshDialog, setShowRecipeRefreshDialog] = useState(false);
   const [showClearConfirmDialog, setShowClearConfirmDialog] = useState(false);
+  const [showUsageTips, setShowUsageTips] = useState(false);
+  const [pageHeight, setPageHeight] = useState<number | null>(null);
+  const [dynamicHeights, setDynamicHeights] = useState({
+    camera: 480,
+    preview: 340,
+    inventoryList: 300,
+    detectedList: 260,
+  });
   
+  const pageRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const tipsRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const { ingredients, addIngredient, setIngredients, removeIngredient, clearIngredients } = useIngredientsStore();
   const { clearRecommendations } = useRecipesStore();
 
   useEffect(() => {
-    if (mode === 'camera') {
-      startCamera();
-    } else {
-      stopCamera();
-    }
-    
+    startCamera();
+
     return () => {
       stopCamera();
     };
-  }, [mode]);
+  }, []);
 
   useEffect(() => {
     if (viewMode === 'inventory') {
       loadAllIngredients();
     }
   }, [viewMode]);
+
+  useEffect(() => {
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = prevBodyOverflow;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+    };
+  }, []);
+
+  useEffect(() => {
+    const updateDynamicHeights = () => {
+      const pageTop = pageRef.current?.getBoundingClientRect().top ?? 0;
+      const contentTop = contentRef.current?.getBoundingClientRect().top ?? pageTop;
+      const tipsHeight = tipsRef.current?.offsetHeight ?? (showUsageTips ? 180 : 52);
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+      const isMobile = window.innerWidth < 768;
+      const drawerBottomOffset = isMobile ? 80 : 24;
+      const drawerReserve = tipsHeight + drawerBottomOffset + 12;
+
+      const availablePageHeight = clamp(Math.floor(viewportHeight - pageTop - 8), 420, 1400);
+      setPageHeight(availablePageHeight);
+
+      const spaceForMainCard = clamp(
+        Math.floor(viewportHeight - contentTop - drawerReserve),
+        220,
+        900
+      );
+
+      const previewHeight = clamp(Math.floor(spaceForMainCard * 0.52), 240, 500);
+      const inventoryListHeight = clamp(
+        spaceForMainCard - (showAddForm ? 250 : 150),
+        160,
+        560
+      );
+      const detectedListHeight = clamp(
+        spaceForMainCard - previewHeight - 180,
+        140,
+        360
+      );
+
+      setDynamicHeights({
+        camera: spaceForMainCard,
+        preview: previewHeight,
+        inventoryList: inventoryListHeight,
+        detectedList: detectedListHeight,
+      });
+    };
+
+    const rafUpdate = () => {
+      requestAnimationFrame(updateDynamicHeights);
+    };
+
+    rafUpdate();
+    window.addEventListener('resize', rafUpdate);
+    window.visualViewport?.addEventListener('resize', rafUpdate);
+
+    return () => {
+      window.removeEventListener('resize', rafUpdate);
+      window.visualViewport?.removeEventListener('resize', rafUpdate);
+    };
+  }, [viewMode, previewUrl, showAddForm, showUsageTips, error]);
 
   const loadAllIngredients = async () => {
     try {
@@ -103,8 +176,7 @@ export default function ScannerPage() {
       }
     } catch (err) {
       console.error('Camera error:', err);
-      setError('无法访问摄像头，请确保已授权摄像头权限或使用上传模式');
-      setMode('upload');
+      setError('无法访问摄像头，请确保已授权摄像头权限');
     }
   };
 
@@ -115,31 +187,58 @@ export default function ScannerPage() {
     }
   };
 
+  const getVisibleVideoCrop = (videoEl: HTMLVideoElement) => {
+    const sourceWidth = videoEl.videoWidth;
+    const sourceHeight = videoEl.videoHeight;
+    const displayWidth = videoEl.clientWidth;
+    const displayHeight = videoEl.clientHeight;
+
+    if (!sourceWidth || !sourceHeight || !displayWidth || !displayHeight) {
+      return {
+        sx: 0,
+        sy: 0,
+        sWidth: sourceWidth,
+        sHeight: sourceHeight,
+      };
+    }
+
+    const sourceRatio = sourceWidth / sourceHeight;
+    const displayRatio = displayWidth / displayHeight;
+
+    if (sourceRatio > displayRatio) {
+      const sWidth = sourceHeight * displayRatio;
+      const sx = (sourceWidth - sWidth) / 2;
+      return { sx, sy: 0, sWidth, sHeight: sourceHeight };
+    }
+
+    const sHeight = sourceWidth / displayRatio;
+    const sy = (sourceHeight - sHeight) / 2;
+    return { sx: 0, sy, sWidth: sourceWidth, sHeight };
+  };
+
   const capturePhoto = () => {
     if (videoRef.current) {
       const canvas = document.createElement('canvas');
-      canvas.width = videoRef.current.videoWidth;
-      canvas.height = videoRef.current.videoHeight;
+      const { sx, sy, sWidth, sHeight } = getVisibleVideoCrop(videoRef.current);
+      canvas.width = Math.max(1, Math.round(sWidth));
+      canvas.height = Math.max(1, Math.round(sHeight));
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        ctx.drawImage(videoRef.current, 0, 0);
+        ctx.drawImage(
+          videoRef.current,
+          sx,
+          sy,
+          sWidth,
+          sHeight,
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
         const imageUrl = canvas.toDataURL('image/jpeg', 0.8);
         setPreviewUrl(imageUrl);
         analyzeImage(imageUrl);
       }
-    }
-  };
-
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const imageUrl = e.target?.result as string;
-        setPreviewUrl(imageUrl);
-        analyzeImage(imageUrl);
-      };
-      reader.readAsDataURL(file);
     }
   };
 
@@ -170,9 +269,6 @@ export default function ScannerPage() {
     setPreviewUrl(null);
     setDetectedIngredients([]);
     setError(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
   };
 
   const saveIngredients = async () => {
@@ -268,15 +364,17 @@ export default function ScannerPage() {
   ];
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <header className="text-center">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
-          {viewMode === 'inventory' ? '📦 我的食材库存' : '📸 扫一扫冰箱'}
-        </h1>
-        <p className="text-sm md:text-base text-gray-500 mt-2 px-4">
-          {viewMode === 'inventory' ? '管理您的食材库存' : 'AI智能识别食材，管理你的饮食库存'}
-        </p>
-      </header>
+    <div
+      ref={pageRef}
+      className="animate-fade-in overflow-hidden overflow-x-hidden flex min-h-0 flex-col gap-4 md:gap-6"
+      style={pageHeight ? { height: `${pageHeight}px` } : undefined}
+    >
+      {viewMode === 'inventory' && (
+        <header className="text-center">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-800">📦 我的食材库存</h1>
+          <p className="text-sm md:text-base text-gray-500 mt-2 px-4">管理您的食材库存</p>
+        </header>
+      )}
 
       <div className="flex flex-wrap justify-center gap-3 px-4">
         {viewMode === 'inventory' ? (
@@ -290,26 +388,10 @@ export default function ScannerPage() {
         ) : (
           <>
             <button
-              onClick={() => setMode('camera')}
-              className={`flex items-center space-x-2 px-5 md:px-6 py-2.5 md:py-3 rounded-full text-sm md:text-base font-medium transition-all ${
-                mode === 'camera'
-                  ? 'bg-primary-500 text-white shadow-lg'
-                  : 'bg-white text-gray-600 hover:bg-gray-50'
-              }`}
+              className="flex items-center space-x-2 px-5 md:px-6 py-2.5 md:py-3 rounded-full text-sm md:text-base font-medium bg-primary-500 text-white shadow-lg"
             >
               <Camera size={18} />
               <span>拍照识别</span>
-            </button>
-            <button
-              onClick={() => setMode('upload')}
-              className={`flex items-center space-x-2 px-5 md:px-6 py-2.5 md:py-3 rounded-full text-sm md:text-base font-medium transition-all ${
-                mode === 'upload'
-                  ? 'bg-primary-500 text-white shadow-lg'
-                  : 'bg-white text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              <Upload size={18} />
-              <span>上传照片</span>
             </button>
             <button
               onClick={() => setViewMode('inventory')}
@@ -329,8 +411,9 @@ export default function ScannerPage() {
         </div>
       )}
 
+      <div ref={contentRef} className="min-h-0 flex-1">
       {viewMode === 'inventory' ? (
-        <div className="card p-4 md:p-6">
+        <div className="card p-4 md:p-6 min-h-0 h-full">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 space-y-3 md:space-y-0">
             <h3 className="text-base md:text-lg font-semibold text-gray-800">
               全部食材 ({ingredients.length} 种)
@@ -438,7 +521,10 @@ export default function ScannerPage() {
               <p className="text-sm mt-2">请扫描添加食材到库存</p>
             </div>
           ) : (
-            <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+            <div
+              className="space-y-3 overflow-y-auto"
+              style={{ maxHeight: `${dynamicHeights.inventoryList}px` }}
+            >
               {ingredients.map((ing) => (
                 <div
                   key={ing.id}
@@ -467,12 +553,13 @@ export default function ScannerPage() {
           )}
         </div>
       ) : previewUrl ? (
-        <div className="card overflow-hidden">
+        <div className="card overflow-hidden min-h-0 h-full">
           <div className="relative">
             <img
               src={previewUrl}
               alt="Scanned"
-              className="w-full h-64 object-cover"
+              className="w-full object-cover"
+              style={{ height: `${dynamicHeights.preview}px` }}
             />
             
             {isAnalyzing && (
@@ -507,7 +594,10 @@ export default function ScannerPage() {
               </button>
             </div>
 
-            <div className="space-y-3 max-h-96 overflow-y-auto">
+            <div
+              className="space-y-3 overflow-y-auto"
+              style={{ maxHeight: `${dynamicHeights.detectedList}px` }}
+            >
               {detectedIngredients.map((ingredient, index) => (
                 <div
                   key={index}
@@ -585,79 +675,76 @@ export default function ScannerPage() {
           </div>
         </div>
       ) : (
-        <div className="card overflow-hidden">
-          {mode === 'camera' ? (
-            <div className="relative">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                className="w-full h-96 object-cover"
-              />
-              
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-64 h-64 border-2 border-white/80 rounded-lg">
-                  <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-8 h-8 border-t-4 border-l-4 border-primary-500 rounded-tl-lg" />
-                  <div className="absolute -top-2 right-1/2 transform translate-x-1/2 w-8 h-8 border-t-4 border-r-4 border-primary-500 rounded-tr-lg" />
-                  <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-8 h-8 border-b-4 border-l-4 border-primary-500 rounded-bl-lg" />
-                  <div className="absolute -bottom-2 right-1/2 transform translate-x-1/2 w-8 h-8 border-b-4 border-r-4 border-primary-500 rounded-br-lg" />
-                </div>
-              </div>
+        <div
+          className="card overflow-hidden min-h-0"
+          style={{ height: `${dynamicHeights.camera}px` }}
+        >
+          <div className="relative bg-black h-full">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              className="w-full h-full object-cover"
+            />
 
-              <button
-                onClick={capturePhoto}
-                className="absolute bottom-8 left-1/2 transform -translate-x-1/2 w-20 h-20 bg-white rounded-full shadow-lg flex items-center justify-center hover:scale-110 transition-transform"
-              >
-                <div className="w-16 h-16 bg-primary-500 rounded-full border-4 border-white" />
-              </button>
-            </div>
-          ) : (
-            <div className="p-8">
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-gray-300 rounded-xl p-12 text-center hover:border-primary-500 transition-colors cursor-pointer"
-              >
-                <Upload size={64} className="mx-auto mb-4 text-gray-400" />
-                <p className="text-lg font-medium text-gray-700 mb-2">
-                  点击上传照片
-                </p>
-                <p className="text-gray-500 text-sm">
-                  支持 JPG、PNG 格式，建议照片清晰、光线充足
-                </p>
+            <div className="absolute top-4 left-4 right-4 pointer-events-none">
+              <div className="rounded-xl bg-black/40 px-3 py-2 text-center text-xs text-white backdrop-blur-sm md:text-sm">
+                将食材放在画面中间，点击下方按钮拍照
               </div>
-              
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
             </div>
-          )}
+
+            <button
+              onClick={capturePhoto}
+              className="absolute bottom-6 left-1/2 transform -translate-x-1/2 w-20 h-20 bg-white rounded-full shadow-lg flex items-center justify-center hover:scale-105 transition-transform"
+            >
+              <div className="w-16 h-16 bg-primary-500 rounded-full border-4 border-white" />
+            </button>
+          </div>
         </div>
       )}
+      </div>
 
-      <div className="card p-6">
-        <h3 className="font-semibold text-gray-800 mb-3">📋 使用提示</h3>
-        <ul className="space-y-2 text-gray-600 text-sm">
-          <li className="flex items-start space-x-2">
-            <span className="text-primary-600">•</span>
-            <span>拍照时保持光线充足，食材清晰可见</span>
-          </li>
-          <li className="flex items-start space-x-2">
-            <span className="text-primary-600">•</span>
-            <span>建议将冰箱门打开或食材取出后拍照</span>
-          </li>
-          <li className="flex items-start space-x-2">
-            <span className="text-primary-600">•</span>
-            <span>识别结果可以手动编辑和补充</span>
-          </li>
-          <li className="flex items-start space-x-2">
-            <span className="text-primary-600">•</span>
-            <span>定期更新库存，系统会提醒即将过期的食材</span>
-          </li>
-        </ul>
+      <div className="fixed inset-x-3 bottom-20 z-40 md:bottom-6 md:left-auto md:right-6 md:w-[360px]">
+        <div
+          ref={tipsRef}
+          className={`rounded-2xl border border-gray-200 bg-white/95 shadow-xl backdrop-blur transition-all duration-300 ${
+            showUsageTips ? 'max-h-[55vh]' : 'max-h-14'
+          } overflow-hidden`}
+        >
+          <button
+            onClick={() => setShowUsageTips((prev) => !prev)}
+            className="w-full flex items-center justify-between px-4 py-3"
+            aria-expanded={showUsageTips}
+          >
+            <h3 className="font-semibold text-gray-800">📋 使用提示</h3>
+            {showUsageTips ? (
+              <ChevronDown size={18} className="text-gray-500" />
+            ) : (
+              <ChevronUp size={18} className="text-gray-500" />
+            )}
+          </button>
+
+          {showUsageTips && (
+            <ul className="px-4 pb-4 space-y-2 text-gray-600 text-sm max-h-[40vh] overflow-y-auto">
+              <li className="flex items-start space-x-2">
+                <span className="text-primary-600">•</span>
+                <span>拍照时保持光线充足，食材清晰可见</span>
+              </li>
+              <li className="flex items-start space-x-2">
+                <span className="text-primary-600">•</span>
+                <span>建议将冰箱门打开或食材取出后拍照</span>
+              </li>
+              <li className="flex items-start space-x-2">
+                <span className="text-primary-600">•</span>
+                <span>识别结果可以手动编辑和补充</span>
+              </li>
+              <li className="flex items-start space-x-2">
+                <span className="text-primary-600">•</span>
+                <span>定期更新库存，系统会提醒即将过期的食材</span>
+              </li>
+            </ul>
+          )}
+        </div>
       </div>
 
       {showRecipeRefreshDialog && (
