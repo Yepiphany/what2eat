@@ -312,21 +312,18 @@ export default function ScannerPage() {
     setError(null);
     
     try {
-      const savedIngredients = [];
       const currentUserId = getUserId();
-      
-      for (const ingredient of validIngredients) {
-        try {
-          const saved = await ingredientApi.addIngredient(ingredient as Partial<Ingredient>, currentUserId);
-          savedIngredients.push(saved);
-        } catch (err) {
-          console.error('Failed to save ingredient:', ingredient.name, err);
-        }
-      }
+      const savedIngredients = await ingredientApi.addIngredientsBatch(
+        validIngredients as Partial<Ingredient>[],
+        currentUserId
+      );
       
       if (savedIngredients.length > 0) {
-        const allIngredients = await ingredientApi.getIngredients(currentUserId);
-        setIngredients(allIngredients);
+        const mergedById = new Map(ingredients.map((item) => [item.id, item]));
+        savedIngredients.forEach((item) => {
+          mergedById.set(item.id, item);
+        });
+        setIngredients(Array.from(mergedById.values()));
         incrementScannedIngredients(savedIngredients.length);
         setShowRecipeRefreshDialog(true);
       } else {

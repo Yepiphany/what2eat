@@ -12,12 +12,17 @@ import uuid
 router = APIRouter()
 supabase = get_supabase_client()
 FALLBACK_INGREDIENTS: list = []
+KNOWN_USERS: set[str] = set()
 
 def ensure_user_exists(user_id: str) -> bool:
     """Check if user exists, if not create a placeholder user"""
     try:
+        if user_id in KNOWN_USERS:
+            return True
+
         result = supabase.table("users").select("id").eq("id", user_id).execute()
         if result.data:
+            KNOWN_USERS.add(user_id)
             return True
         
         supabase.table("users").insert({
@@ -26,6 +31,7 @@ def ensure_user_exists(user_id: str) -> bool:
             "email": None
         }).execute()
         print(f"[INFO] Auto-created user record: {user_id[:8]}...")
+        KNOWN_USERS.add(user_id)
         return True
     except Exception as e:
         print(f"[WARN] Failed to ensure user exists: {e}")
@@ -98,6 +104,59 @@ async def add_ingredient(ingredient: IngredientCreate, user_id: str):
                 raise HTTPException(status_code=400, detail=f"Validation error: {ve}")
             FALLBACK_INGREDIENTS.append(resp.model_dump())
             return resp
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/batch", response_model=List[IngredientResponse])
+async def add_ingredients_batch(ingredients: List[IngredientCreate], user_id: str):
+    try:
+        if not ingredients:
+            return []
+
+        ensure_user_exists(user_id)
+        payload = []
+        for ingredient in ingredients:
+            data = ingredient.model_dump()
+            data["user_id"] = user_id
+            payload.append(data)
+
+        result = supabase.table("ingredients").insert(payload).execute()
+
+        if result.data:
+            return [IngredientResponse(**item) for item in result.data]
+
+        now = datetime.now().isoformat()
+        fallback_items: List[IngredientResponse] = []
+        for data in payload:
+            item = {
+                **data,
+                "id": str(uuid.uuid4()),
+                "created_at": now,
+                "updated_at": now,
+            }
+            if item.get("expiry_date"):
+                try:
+                    expiry = item["expiry_date"]
+                    if isinstance(expiry, str):
+                        expiry_dt = datetime.fromisoformat(expiry.replace("Z", "+00:00"))
+                    else:
+                        expiry_dt = expiry
+                    days_left = (expiry_dt - datetime.now()).days
+                    item["days_until_expiry"] = days_left
+                    item["is_expiring_soon"] = days_left <= 2
+                except Exception:
+                    item["days_until_expiry"] = None
+                    item["is_expiring_soon"] = False
+            else:
+                item["days_until_expiry"] = None
+                item["is_expiring_soon"] = False
+
+            resp = IngredientResponse(**item)
+            FALLBACK_INGREDIENTS.append(resp.model_dump())
+            fallback_items.append(resp)
+
+        return fallback_items
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
