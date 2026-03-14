@@ -618,12 +618,12 @@ export default function ScannerPage() {
                   {detectedIngredients.map((ingredient, index) => (
                     <div
                       key={index}
-                      className="flex items-center space-x-2 md:space-x-3 p-2.5 md:p-3 bg-gray-50 rounded-lg"
+                      className="w-full max-w-full flex flex-wrap items-center gap-1.5 md:gap-2 p-2 md:p-2.5 bg-gray-50 rounded-lg"
                     >
                       <select
                         value={ingredient.category || 'other'}
                         onChange={(e) => updateIngredient(index, 'category', e.target.value)}
-                        className={`px-2 md:px-3 py-1 rounded-full text-xs md:text-sm font-medium border-none cursor-pointer ${categoryColors[ingredient.category || 'other']}`}
+                        className={`shrink-0 px-2 py-1 rounded-full text-[11px] md:text-xs font-medium border-none cursor-pointer ${categoryColors[ingredient.category || 'other']}`}
                       >
                         {categoryOptions.map(option => (
                           <option key={option.value} value={option.value}>
@@ -637,20 +637,20 @@ export default function ScannerPage() {
                         value={ingredient.name || ''}
                         onChange={(e) => updateIngredient(index, 'name', e.target.value)}
                         placeholder="食材名称"
-                        className="flex-1 px-2 md:px-3 py-1.5 md:py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                          className="flex-1 min-w-0 basis-[72px] px-2 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-xs md:text-sm"
                       />
 
                       <input
                         type="number"
                         value={ingredient.quantity || 1}
                         onChange={(e) => updateIngredient(index, 'quantity', parseFloat(e.target.value) || 1)}
-                        className="w-14 md:w-16 px-2 py-1.5 md:py-2 border border-gray-200 rounded-lg text-center text-sm"
+                        className="w-12 md:w-14 shrink-0 px-1.5 py-1.5 border border-gray-200 rounded-lg text-center text-xs md:text-sm"
                       />
 
                       <select
                         value={ingredient.unit || '个'}
                         onChange={(e) => updateIngredient(index, 'unit', e.target.value)}
-                        className="px-2 py-1.5 md:py-2 border border-gray-200 rounded-lg text-sm"
+                        className="shrink-0 max-w-[66px] px-1.5 py-1.5 border border-gray-200 rounded-lg text-xs md:text-sm"
                       >
                         <option value="个">个</option>
                         <option value="斤">斤</option>
@@ -664,7 +664,7 @@ export default function ScannerPage() {
 
                       <button
                         onClick={() => removeDetectedIngredient(index)}
-                        className="p-1.5 md:p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        className="shrink-0 p-1.5 md:p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                       >
                         <X size={16} />
                       </button>
