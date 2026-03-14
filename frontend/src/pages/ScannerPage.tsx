@@ -70,11 +70,14 @@ export default function ScannerPage() {
     const updateDynamicHeights = () => {
       const pageTop = pageRef.current?.getBoundingClientRect().top ?? 0;
       const contentTop = contentRef.current?.getBoundingClientRect().top ?? pageTop;
-      const tipsHeight = tipsRef.current?.offsetHeight ?? (showUsageTips ? 180 : 52);
       const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
       const isMobile = window.innerWidth < 768;
-      const drawerBottomOffset = isMobile ? 80 : 24;
-      const drawerReserve = tipsHeight + drawerBottomOffset + 12;
+      const isScanView = viewMode === 'scan';
+      const tipsHeight = isScanView
+        ? (previewUrl ? 52 : (tipsRef.current?.offsetHeight ?? (showUsageTips ? 180 : 52)))
+        : 0;
+      const drawerBottomOffset = isScanView ? (isMobile ? 80 : 24) : 0;
+      const drawerReserve = isScanView ? tipsHeight + drawerBottomOffset + 12 : 0;
 
       const availablePageHeight = clamp(Math.floor(viewportHeight - pageTop - 8), 420, 1400);
       setPageHeight(availablePageHeight);
@@ -220,10 +223,15 @@ export default function ScannerPage() {
     if (videoRef.current) {
       const canvas = document.createElement('canvas');
       const { sx, sy, sWidth, sHeight } = getVisibleVideoCrop(videoRef.current);
-      canvas.width = Math.max(1, Math.round(sWidth));
-      canvas.height = Math.max(1, Math.round(sHeight));
+      const devicePixelRatio = window.devicePixelRatio || 1;
+      const outputWidth = Math.max(1, Math.round(videoRef.current.clientWidth * devicePixelRatio));
+      const outputHeight = Math.max(1, Math.round(videoRef.current.clientHeight * devicePixelRatio));
+      canvas.width = outputWidth;
+      canvas.height = outputHeight;
       const ctx = canvas.getContext('2d');
       if (ctx) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(
           videoRef.current,
           sx,
@@ -232,8 +240,8 @@ export default function ScannerPage() {
           sHeight,
           0,
           0,
-          canvas.width,
-          canvas.height
+          outputWidth,
+          outputHeight
         );
         const imageUrl = canvas.toDataURL('image/jpeg', 0.8);
         setPreviewUrl(imageUrl);
@@ -553,17 +561,28 @@ export default function ScannerPage() {
           )}
         </div>
       ) : previewUrl ? (
-        <div className="card overflow-hidden min-h-0 h-full">
-          <div className="relative">
+        <div
+          className="card overflow-hidden min-h-0"
+          style={{ height: `${dynamicHeights.camera}px` }}
+        >
+          <div className="relative h-full bg-black">
             <img
               src={previewUrl}
               alt="Scanned"
-              className="w-full object-cover"
-              style={{ height: `${dynamicHeights.preview}px` }}
+              className="w-full h-full object-cover object-center"
             />
+
+            <div className="absolute top-3 right-3 z-20">
+              <button
+                onClick={resetScanner}
+                className="w-10 h-10 rounded-full bg-black/55 text-white flex items-center justify-center backdrop-blur hover:bg-black/70 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
             
             {isAnalyzing && (
-              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+              <div className="absolute inset-0 z-30 bg-black/50 flex items-center justify-center">
                 <div className="text-center text-white p-4">
                   <RefreshCw size={40} className="animate-spin mx-auto mb-3 md:mb-4" />
                   <p className="text-base md:text-lg font-medium">AI正在识别食材...</p>
@@ -572,105 +591,105 @@ export default function ScannerPage() {
             )}
             
             {isSaving && !isAnalyzing && (
-              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+              <div className="absolute inset-0 z-30 bg-black/50 flex items-center justify-center">
                 <div className="text-center text-white p-4">
                   <RefreshCw size={40} className="animate-spin mx-auto mb-3 md:mb-4" />
                   <p className="text-base md:text-lg font-medium">正在将食材加入库存...</p>
                 </div>
               </div>
             )}
-          </div>
 
-          <div className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">
-                识别结果 ({detectedIngredients.length} 种食材)
-              </h3>
-              <button
-                onClick={resetScanner}
-                className="text-gray-500 hover:text-gray-700"
+              <div
+                className={`fixed inset-x-3 bottom-20 md:bottom-6 md:left-auto md:right-6 md:w-[360px] ${
+                  isAnalyzing || isSaving ? 'z-40' : 'z-20'
+                }`}
               >
-                <X size={24} />
-              </button>
-            </div>
+              <div className="rounded-2xl border border-gray-200 bg-white/95 shadow-xl backdrop-blur transition-all duration-300 overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                  <h3 className="text-base md:text-lg font-semibold text-gray-800">
+                    识别结果 ({detectedIngredients.length} 种食材)
+                  </h3>
+                </div>
 
-            <div
-              className="space-y-3 overflow-y-auto"
-              style={{ maxHeight: `${dynamicHeights.detectedList}px` }}
-            >
-              {detectedIngredients.map((ingredient, index) => (
                 <div
-                  key={index}
-                  className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg"
+                  className="space-y-2 md:space-y-3 overflow-y-auto px-4 pt-3"
+                  style={{ maxHeight: `${dynamicHeights.detectedList}px` }}
                 >
-                  <select
-                    value={ingredient.category || 'other'}
-                    onChange={(e) => updateIngredient(index, 'category', e.target.value)}
-                    className={`px-3 py-1 rounded-full text-sm font-medium border-none cursor-pointer ${categoryColors[ingredient.category || 'other']}`}
-                  >
-                    {categoryOptions.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                  
-                  <input
-                    type="text"
-                    value={ingredient.name || ''}
-                    onChange={(e) => updateIngredient(index, 'name', e.target.value)}
-                    placeholder="食材名称"
-                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                  
-                  <input
-                    type="number"
-                    value={ingredient.quantity || 1}
-                    onChange={(e) => updateIngredient(index, 'quantity', parseFloat(e.target.value) || 1)}
-                    className="w-16 px-2 py-2 border border-gray-200 rounded-lg text-center"
-                  />
-                  
-                  <select
-                    value={ingredient.unit || '个'}
-                    onChange={(e) => updateIngredient(index, 'unit', e.target.value)}
-                    className="px-2 py-2 border border-gray-200 rounded-lg"
-                  >
-                    <option value="个">个</option>
-                    <option value="斤">斤</option>
-                    <option value="克">克</option>
-                    <option value="千克">千克</option>
-                    <option value="毫升">毫升</option>
-                    <option value="升">升</option>
-                    <option value="把">把</option>
-                    <option value="根">根</option>
-                  </select>
-                  
+                  {detectedIngredients.map((ingredient, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center space-x-2 md:space-x-3 p-2.5 md:p-3 bg-gray-50 rounded-lg"
+                    >
+                      <select
+                        value={ingredient.category || 'other'}
+                        onChange={(e) => updateIngredient(index, 'category', e.target.value)}
+                        className={`px-2 md:px-3 py-1 rounded-full text-xs md:text-sm font-medium border-none cursor-pointer ${categoryColors[ingredient.category || 'other']}`}
+                      >
+                        {categoryOptions.map(option => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+
+                      <input
+                        type="text"
+                        value={ingredient.name || ''}
+                        onChange={(e) => updateIngredient(index, 'name', e.target.value)}
+                        placeholder="食材名称"
+                        className="flex-1 px-2 md:px-3 py-1.5 md:py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                      />
+
+                      <input
+                        type="number"
+                        value={ingredient.quantity || 1}
+                        onChange={(e) => updateIngredient(index, 'quantity', parseFloat(e.target.value) || 1)}
+                        className="w-14 md:w-16 px-2 py-1.5 md:py-2 border border-gray-200 rounded-lg text-center text-sm"
+                      />
+
+                      <select
+                        value={ingredient.unit || '个'}
+                        onChange={(e) => updateIngredient(index, 'unit', e.target.value)}
+                        className="px-2 py-1.5 md:py-2 border border-gray-200 rounded-lg text-sm"
+                      >
+                        <option value="个">个</option>
+                        <option value="斤">斤</option>
+                        <option value="克">克</option>
+                        <option value="千克">千克</option>
+                        <option value="毫升">毫升</option>
+                        <option value="升">升</option>
+                        <option value="把">把</option>
+                        <option value="根">根</option>
+                      </select>
+
+                      <button
+                        onClick={() => removeDetectedIngredient(index)}
+                        className="p-1.5 md:p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-3 md:mt-4 flex space-x-2 md:space-x-3 px-4 pb-4">
                   <button
-                    onClick={() => removeDetectedIngredient(index)}
-                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                    onClick={addCustomIngredient}
+                    className="flex-1 btn-secondary flex items-center justify-center space-x-2"
                   >
-                    <X size={18} />
+                    <Plus size={18} />
+                    <span>添加食材</span>
+                  </button>
+                  <button
+                    onClick={saveIngredients}
+                    disabled={detectedIngredients.length === 0}
+                    className="flex-1 btn-primary flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Check size={18} />
+                    <span>保存到库存</span>
                   </button>
                 </div>
-              ))}
-            </div>
-
-            <div className="mt-4 flex space-x-3">
-              <button
-                onClick={addCustomIngredient}
-                className="flex-1 btn-secondary flex items-center justify-center space-x-2"
-              >
-                <Plus size={20} />
-                <span>添加食材</span>
-              </button>
-              <button
-                onClick={saveIngredients}
-                disabled={detectedIngredients.length === 0}
-                className="flex-1 btn-primary flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Check size={20} />
-                <span>保存到库存</span>
-              </button>
+              </div>
             </div>
           </div>
         </div>
@@ -704,6 +723,7 @@ export default function ScannerPage() {
       )}
       </div>
 
+      {viewMode === 'scan' && !previewUrl && (
       <div className="fixed inset-x-3 bottom-20 z-40 md:bottom-6 md:left-auto md:right-6 md:w-[360px]">
         <div
           ref={tipsRef}
@@ -746,6 +766,7 @@ export default function ScannerPage() {
           )}
         </div>
       </div>
+      )}
 
       {showRecipeRefreshDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
