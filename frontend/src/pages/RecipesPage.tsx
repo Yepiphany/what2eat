@@ -14,7 +14,7 @@ const difficultyOptions = [
 export default function RecipesPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [showExcludeModal, setShowExcludeModal] = useState(false);
-  const [showApiLimitDialog, setShowApiLimitDialog] = useState(false);
+  const [showFetchErrorDialog, setShowFetchErrorDialog] = useState(false);
   const [hasInitialLoad, setHasInitialLoad] = useState(false);
   const [isLoadingFromDb, setIsLoadingFromDb] = useState(false);
   const [isFirstTimeLoading, setIsFirstTimeLoading] = useState(true);
@@ -62,10 +62,9 @@ export default function RecipesPage() {
       const recipes = await recipeApi.getRecommendations(request);
       console.log('[DEBUG] API 返回', recipes.length, '道菜谱');
       
-      // 检查是否 API 返回空结果（可能达到限额）
+      // API 返回空结果时提示用户重试
       if (recipes.length === 0) {
-        // 无论是否有已有菜谱，都弹出对话框
-        setShowApiLimitDialog(true);
+        setShowFetchErrorDialog(true);
         setIsFirstTimeLoading(false);
         return;
       }
@@ -92,8 +91,7 @@ export default function RecipesPage() {
       setIsFirstTimeLoading(false);
     } catch (error) {
       console.error('Failed to fetch recipes:', error);
-      // 无论是否有已有菜谱，都弹出对话框
-      setShowApiLimitDialog(true);
+      setShowFetchErrorDialog(true);
       // 即使出错也设置 isFirstTimeLoading 为 false，避免无限加载
       setIsFirstTimeLoading(false);
     } finally {
@@ -415,7 +413,7 @@ export default function RecipesPage() {
         </div>
       )}
 
-      {showApiLimitDialog && (
+      {showFetchErrorDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fade-in">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
             <div className="text-center mb-6">
@@ -424,7 +422,7 @@ export default function RecipesPage() {
               </div>
               <h3 className="text-xl font-bold text-gray-800 mb-2">获取菜谱失败</h3>
               <p className="text-gray-500">
-                很抱歉，您已达今日推荐限额，暂时无法获取新菜谱。
+                暂时无法获取新菜谱，请稍后再试。
                 {recipePages.length > 0 && (
                   <>
                     <br />
@@ -436,7 +434,7 @@ export default function RecipesPage() {
             
             <div className="flex space-x-3">
               <button
-                onClick={() => setShowApiLimitDialog(false)}
+                onClick={() => setShowFetchErrorDialog(false)}
                 className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
               >
                 关闭
@@ -444,7 +442,7 @@ export default function RecipesPage() {
               {recipePages.length > 0 && (
                 <button
                   onClick={() => {
-                    setShowApiLimitDialog(false);
+                    setShowFetchErrorDialog(false);
                     setCurrentPage(0);
                   }}
                   className="flex-1 px-4 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors"
