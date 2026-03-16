@@ -55,9 +55,18 @@ const categoryRules: Array<{
     },
     { keywords: ["可乐", "牛奶", "果汁", "茶"], category: "beverage" },
     {
-        keywords: ["菜", "番茄", "土豆", "白菜", "黄瓜", "西兰花"],
+        keywords: ["菜", "番茄", "土豆", "白菜", "黄瓜", "西兰花", "豆角"],
         category: "vegetable",
     },
+];
+
+const QUANTITY_UNIT_PATTERN =
+    "([零一二两三四五六七八九十百千半几俩仨\\d.]+)\\s*(斤|两|千克|公斤|kg|克|g|个|颗|根|只|盒|袋|瓶|块|条|把|份|片|毫升|升|ml|l)";
+
+const ASR_NAME_CORRECTIONS: Array<[RegExp, string]> = [
+    [/炉鱼|路鱼|鲈于/g, "鲈鱼"],
+    [/豆角儿/g, "豆角"],
+    [/鸡旦/g, "鸡蛋"],
 ];
 
 const chineseDigitMap: Record<string, number> = {
@@ -94,6 +103,9 @@ const parseChineseNumber = (raw: string): number => {
     if (!normalized) return 1;
     if (!Number.isNaN(Number(normalized))) return Number(normalized);
     if (normalized === "半") return 0.5;
+    if (normalized === "几") return 3;
+    if (normalized === "俩") return 2;
+    if (normalized === "仨") return 3;
 
     if (normalized.startsWith("半") && normalized.length > 1) {
         const tail = parseChineseNumber(normalized.slice(1));
@@ -125,8 +137,7 @@ type QuantityToken = {
 };
 
 const extractQuantityTokens = (chunk: string): QuantityToken[] => {
-    const quantityRegex =
-        /([零一二两三四五六七八九十百千半\d.]+)\s*(斤|两|千克|公斤|kg|克|g|个|颗|根|只|盒|袋|瓶|块|条|把|份|片|毫升|升|ml|l)/gi;
+    const quantityRegex = new RegExp(QUANTITY_UNIT_PATTERN, "gi");
     const tokens: QuantityToken[] = [];
 
     let match: RegExpExecArray | null = null;
@@ -167,10 +178,24 @@ const inferCategory = (name: string): IngredientCategory => {
     return "other";
 };
 
+const normalizeIngredientName = (rawName: string): string => {
+    let normalized = rawName;
+    for (const [pattern, replacement] of ASR_NAME_CORRECTIONS) {
+        normalized = normalized.replace(pattern, replacement);
+    }
+
+    return normalized
+        .replace(/^(我|又|刚|刚刚|刚买的|新买的|买的|又买的|来点|来份|有|还有|再来|再加|请|帮我|把|给我|一下)+/g, "")
+        .replace(/^(又买了|买了)\s*/g, "")
+        .replace(/^(大概|约|大约|差不多)\s*/g, "")
+        .replace(/^(一|二|两|三|四|五|六|七|八|九|十|几|俩|仨)\s*(个|颗|根|只|盒|袋|瓶|块|条|把|份|片)\s*/g, "")
+        .trim();
+};
+
 const parseInventoryItems = (input: string): Array<Partial<Ingredient>> => {
     const cleaned = input
         .replace(
-            /今天|刚刚|我买了|买了|帮我|请|库存|食材|加到|添加到|添加|入库|放进冰箱/g,
+            /今天|刚刚|刚才|我刚刚|我刚|我又刚买了|我又买了|我买了|又买了|买了|帮我|请|库存|食材|加到|添加到|添加|入库|放进冰箱/g,
             "",
         )
         .replace(/[。！？!?.]/g, "");
@@ -189,23 +214,19 @@ const parseInventoryItems = (input: string): Array<Partial<Ingredient>> => {
                 ? chunk.split("的").pop() || chunk
                 : chunk;
             const nameWithoutQuantities = rawNamePart
-                .replace(
-                    /([零一二两三四五六七八九十百千半\d.]+)\s*(斤|两|千克|公斤|kg|克|g|个|颗|根|只|盒|袋|瓶|块|条|把|份|片|毫升|升|ml|l)/gi,
-                    "",
-                )
+                .replace(new RegExp(QUANTITY_UNIT_PATTERN, "gi"), "")
                 .replace(/^[是了的在买到\s]+/g, "")
                 .replace(/[^\u4e00-\u9fa5A-Za-z]/g, "")
                 .trim();
 
             const fallbackName = chunk
-                .replace(
-                    /([零一二两三四五六七八九十百千半\d.]+)\s*(斤|两|千克|公斤|kg|克|g|个|颗|根|只|盒|袋|瓶|块|条|把|份|片|毫升|升|ml|l)/gi,
-                    "",
-                )
+                .replace(new RegExp(QUANTITY_UNIT_PATTERN, "gi"), "")
                 .replace(/[^\u4e00-\u9fa5A-Za-z]/g, "")
                 .trim();
 
-            const name = nameWithoutQuantities || fallbackName;
+            const name = normalizeIngredientName(
+                nameWithoutQuantities || fallbackName,
+            );
 
             if (!name) return null;
 
@@ -517,8 +538,9 @@ export default function VoiceAssistant() {
     };
 
     const submitText = async () => {
-        await handleCommand(input);
+        const textToSubmit = input;
         setInput("");
+        await handleCommand(textToSubmit);
     };
 
     return (
@@ -578,7 +600,7 @@ export default function VoiceAssistant() {
                         {messages.map((msg) => (
                             <div
                                 key={msg.id}
-                                className={`max-w-[85%] px-3 py-2 rounded-xl text-sm leading-relaxed ${
+                                className={`w-fit max-w-[85%] px-3 py-2 rounded-xl text-sm leading-relaxed whitespace-pre-wrap break-words ${
                                     msg.role === "assistant"
                                         ? "bg-gray-100 text-gray-700"
                                         : "ml-auto bg-primary-500 text-white"
