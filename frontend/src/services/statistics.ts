@@ -1,14 +1,45 @@
 const STORAGE_KEY_SCANNED = 'stats_scanned_ingredients';
 const STORAGE_KEY_VIEWED = 'stats_viewed_recipes';
 
+type DailyCounter = {
+  date: string;
+  count: number;
+};
+
+function getTodayKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 function readCount(key: string): number {
   const raw = localStorage.getItem(key);
-  const parsed = raw ? parseInt(raw, 10) : 0;
-  return Number.isFinite(parsed) ? parsed : 0;
+  if (!raw) return 0;
+
+  // Backward compatibility for old numeric payloads.
+  const legacy = parseInt(raw, 10);
+  if (Number.isFinite(legacy)) {
+    return Math.max(0, legacy);
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<DailyCounter>;
+    if (!parsed || typeof parsed.count !== 'number' || typeof parsed.date !== 'string') {
+      return 0;
+    }
+    if (parsed.date !== getTodayKey()) {
+      return 0;
+    }
+    return Math.max(0, parsed.count);
+  } catch {
+    return 0;
+  }
 }
 
 function writeCount(key: string, value: number): void {
-  localStorage.setItem(key, String(Math.max(0, value)));
+  const payload: DailyCounter = {
+    date: getTodayKey(),
+    count: Math.max(0, value),
+  };
+  localStorage.setItem(key, JSON.stringify(payload));
 }
 
 export function getScannedIngredientsCount(): number {

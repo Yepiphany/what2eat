@@ -59,15 +59,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
+        <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 [--layout-top-space:1.5rem] [--layout-nav-space:6rem]">
             <VoiceAssistant />
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24">
                 {children}
             </main>
 
-            <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 md:hidden">
-                <div className="flex justify-around py-2">
+            <nav className="fixed bottom-0 left-0 right-0 h-20 bg-white border-t border-gray-200 md:hidden">
+                <div className="flex h-full items-center justify-around py-2">
                     {navItems.map((item) => {
                         const Icon = item.icon;
                         const isActive = isNavItemActive(item.path);

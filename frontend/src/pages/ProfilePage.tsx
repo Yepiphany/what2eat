@@ -404,13 +404,13 @@ export default function ProfilePage() {
                 </div>
 
                 {/* stats */}
-                <div className="card p-6">
+                <div id="today-stats" className="card p-6 scroll-mt-20">
                     <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
                         <TrendingUp
                             size={20}
                             className="mr-2 text-primary-600"
                         />
-                        本周统计
+                        今日统计
                     </h3>
 
                     <div className="grid grid-cols-3 gap-4">

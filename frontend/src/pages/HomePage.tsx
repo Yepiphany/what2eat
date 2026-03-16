@@ -6,13 +6,15 @@ import {
     ChefHat,
     ArrowRight,
     Sparkles,
-    Plus,
-    X,
     ShoppingCart,
-    Check,
     RefreshCw,
     Trash2,
+    PieChart,
+    Settings,
+    Carrot,
+    X,
 } from "lucide-react";
+
 import { useIngredientsStore, useRecipesStore } from "../stores";
 import { ingredientApi } from "../services/api";
 import type { Ingredient } from "../types";
@@ -30,7 +32,7 @@ import {
 
 export default function HomePage() {
     const navigate = useNavigate();
-    const { ingredients, addIngredient, removeIngredient, clearIngredients } =
+    const { ingredients, addIngredient, clearIngredients } =
         useIngredientsStore();
     const {
         recommendations,
@@ -49,6 +51,7 @@ export default function HomePage() {
     const [showRecipeRefreshDialog, setShowRecipeRefreshDialog] =
         useState(false);
     const [showClearConfirmDialog, setShowClearConfirmDialog] = useState(false);
+    const [activeIndex, setActiveIndex] = useState(0);
     const { shoppingLists } = useShoppingLists("pending");
 
     const expiringSoon = ingredients.filter((ing) => ing.is_expiring_soon);
@@ -67,6 +70,33 @@ export default function HomePage() {
         );
         return count + pendingItems.length;
     }, 0);
+
+    const cardDescriptions: Record<string, string> = {
+        scan: "拍照识别冰箱食材，自动整理库存和保鲜状态。",
+        recommend: "根据当前食材智能匹配可做菜谱，减少决策成本。",
+        inventory: "查看现有食材与保质提醒，及时补充和清理库存。",
+        shopping: "汇总缺失食材，快速生成待采购清单。",
+        stats: "追踪今日库存、推荐与采购数量变化。",
+        profile: "管理口味偏好与使用习惯，让推荐更贴合你。",
+    };
+
+    const cardActions: Record<string, { to: string; label: string }> = {
+        scan: { to: "/scan", label: "去扫描" },
+        recommend: { to: "/cook/recommendations", label: "查看推荐" },
+        inventory: { to: "/food", label: "查看库存" },
+        shopping: { to: "/food/shopping", label: "前往采购" },
+        stats: { to: "/profile#today-stats", label: "查看统计" },
+        profile: { to: "/profile", label: "个性化设置" },
+    };
+
+    const cardActionStyles: Record<string, string> = {
+        scan: "bg-primary-400 hover:bg-primary-500",
+        recommend: "bg-accent-400 hover:bg-accent-500",
+        inventory: "bg-orange-400 hover:bg-orange-500",
+        shopping: "bg-orange-400 hover:bg-orange-500",
+        stats: "bg-blue-400 hover:bg-blue-500",
+        profile: "bg-gray-400 hover:bg-gray-500",
+    };
 
     const handleAddIngredient = async () => {
         if (!newIngredient.name.trim()) return;
@@ -94,501 +124,366 @@ export default function HomePage() {
         }
     };
 
-    const handleDeleteIngredient = async (ingredientId: string) => {
-        if (!confirm("确定要删除这个食材吗？")) {
-            return;
-        }
-        try {
-            await ingredientApi.deleteIngredient(ingredientId, getUserId());
-            removeIngredient(ingredientId);
-            markRecipeCacheDirty();
-            setShowRecipeRefreshDialog(true);
-        } catch (err) {
-            console.error("Failed to delete ingredient:", err);
-        }
-    };
-
     return (
-        <div className="space-y-8 animate-fade-in">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Link
-                    to="/scan"
-                    className="card p-6 md:p-8 group border-2 border-transparent hover:border-primary-500 min-h-[140px] md:min-h-[160px] flex items-center"
-                >
-                    <div className="flex items-center space-x-4 md:space-x-6 w-full">
-                        <div className="w-20 h-20 md:w-32 md:h-32 bg-primary-100 rounded-xl md:rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform flex-shrink-0">
-                            <Scan
-                                size={48}
-                                className="text-primary-600 md:hidden"
-                            />
-                            <Scan
-                                size={72}
-                                className="text-primary-600 hidden md:block"
-                            />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <h3 className="text-lg md:text-2xl font-semibold text-gray-800">
-                                扫一扫冰箱
-                            </h3>
-                            <p className="text-gray-500 text-sm md:text-base mt-1 md:mt-2">
-                                AI识别食材，智能管理库存
-                            </p>
-                        </div>
-                    </div>
-                    <div className="w-10 h-10 md:w-12 md:h-12 bg-gray-100 rounded-lg md:rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform ml-auto flex-shrink-0">
-                        <ArrowRight
-                            size={20}
-                            className="text-gray-400 group-hover:text-primary-600 transition-colors md:hidden"
-                        />
-                        <ArrowRight
-                            size={24}
-                            className="text-gray-400 group-hover:text-primary-600 transition-colors hidden md:block"
-                        />
-                    </div>
-                </Link>
-
-                <div className="flex flex-col gap-6">
-                    <Link
-                        to="/cook/recommendations"
-                        className="card p-4 md:p-6 group border-2 border-transparent hover:border-accent-500"
-                    >
-                        <div className="flex items-center space-x-3 md:space-x-4">
-                            <div className="w-12 h-12 md:w-16 md:h-16 bg-accent-100 rounded-lg md:rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform flex-shrink-0">
-                                <Utensils
-                                    size={24}
-                                    className="text-accent-600 md:hidden"
-                                />
-                                <Utensils
-                                    size={32}
-                                    className="text-accent-600 hidden md:block"
-                                />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <h3 className="text-base md:text-xl font-semibold text-gray-800">
-                                    智能推荐
-                                </h3>
-                                <p className="text-gray-500 text-xs md:text-sm mt-0.5 md:mt-1">
-                                    根据食材推荐美味菜谱
-                                </p>
-                            </div>
-                            <ArrowRight
-                                size={18}
-                                className="text-gray-400 group-hover:text-accent-600 transition-colors md:hidden flex-shrink-0"
-                            />
-                            <ArrowRight
-                                size={20}
-                                className="text-gray-400 group-hover:text-accent-600 transition-colors hidden md:block flex-shrink-0"
-                            />
-                        </div>
-                    </Link>
-
-                    <Link
-                        to="/profile"
-                        className="card p-4 md:p-6 group border-2 border-transparent hover:border-purple-500"
-                    >
-                        <div className="flex items-center space-x-3 md:space-x-4">
-                            <div className="w-12 h-12 md:w-16 md:h-16 bg-purple-100 rounded-lg md:rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform flex-shrink-0">
-                                <Sparkles
-                                    size={24}
-                                    className="text-purple-600 md:hidden"
-                                />
-                                <Sparkles
-                                    size={32}
-                                    className="text-purple-600 hidden md:block"
-                                />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <h3 className="text-base md:text-xl font-semibold text-gray-800">
-                                    个性化设置
-                                </h3>
-                                <p className="text-gray-500 text-xs md:text-sm mt-0.5 md:mt-1">
-                                    定制你的口味偏好
-                                </p>
-                            </div>
-                            <ArrowRight
-                                size={18}
-                                className="text-gray-400 group-hover:text-purple-600 transition-colors md:hidden flex-shrink-0"
-                            />
-                            <ArrowRight
-                                size={20}
-                                className="text-gray-400 group-hover:text-purple-600 transition-colors hidden md:block flex-shrink-0"
-                            />
-                        </div>
-                    </Link>
+        <div className="relative h-[calc(100dvh-var(--layout-top-space)-var(--layout-nav-space))] w-full overflow-hidden animate-fade-in flex flex-col items-center bg-transparent">
+            <div className="relative w-[100%] h-full pt-4 pb-1">
+                <div className="relative z-20 mb-3 flex items-center justify-center gap-2">
+                    <Utensils size={20} className="text-primary-600" />
+                    <h1 className="text-3xl font-extrabold tracking-wide text-gray-800">
+                        今天吃什么
+                    </h1>
                 </div>
-            </div>
-
-            {hasIngredients && (
-                <section className="card p-4 md:p-6">
-                    <div className="flex items-center justify-between mb-3 md:mb-4">
-                        <h2 className="text-base md:text-xl font-semibold text-gray-800">
-                            我的食材库存
-                        </h2>
-                        <div className="flex items-center space-x-2">
-                            <button
-                                onClick={() => setShowClearConfirmDialog(true)}
-                                disabled={ingredients.length === 0}
-                                className="flex items-center space-x-1 px-2 py-1 md:py-1.5 bg-red-500 text-white text-xs md:text-sm rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <Trash2 size={12} className="md:hidden" />
-                                <Trash2 size={14} className="hidden md:block" />
-                                <span>清空</span>
-                            </button>
-                            <button
-                                onClick={() => setShowAddForm(true)}
-                                className="flex items-center space-x-1 px-2 py-1 md:px-3 md:py-1.5 bg-primary-500 text-white text-xs md:text-sm rounded-lg hover:bg-primary-600 transition-colors"
-                            >
-                                <Plus size={12} className="md:hidden" />
-                                <Plus size={14} className="hidden md:block" />
-                                <span>手动添加</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    {expiringSoon.length > 0 && (
-                        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-                            <div className="flex items-center space-x-2 text-red-700">
-                                <ChefHat size={20} />
-                                <span className="font-medium">
-                                    即将过期提醒
-                                </span>
-                            </div>
-                            <p className="text-red-600 text-sm mt-1">
-                                {expiringSoon.map((ing) => ing.name).join("、")}{" "}
-                                即将过期，建议尽快使用！
-                            </p>
-                        </div>
-                    )}
-
-                    {showAddForm && (
-                        <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-                            <div className="flex items-end space-x-3">
-                                <div className="flex-1">
-                                    <label className="block text-sm text-gray-600 mb-1">
-                                        食材名称
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={newIngredient.name}
-                                        onChange={(e) =>
-                                            setNewIngredient((prev) => ({
-                                                ...prev,
-                                                name: e.target.value,
-                                            }))
-                                        }
-                                        placeholder="例如：番茄"
-                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                {[
+                    {
+                        id: "scan",
+                        title: "扫描冰箱",
+                        icon: <Scan size={24} className="text-primary-600" />,
+                        bgBorder: "border-primary-200/60",
+                        content: (
+                            <div className="flex items-center space-x-4 h-full px-2">
+                                <div className="w-16 h-16 bg-primary-100 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-inner">
+                                    <Scan
+                                        size={32}
+                                        className="text-primary-600"
                                     />
                                 </div>
-                                <div className="w-20">
-                                    <label className="block text-sm text-gray-600 mb-1">
-                                        数量
-                                    </label>
-                                    <input
-                                        type="number"
-                                        value={newIngredient.quantity}
-                                        onChange={(e) =>
-                                            setNewIngredient((prev) => ({
-                                                ...prev,
-                                                quantity:
-                                                    parseFloat(
-                                                        e.target.value,
-                                                    ) || 1,
-                                            }))
-                                        }
-                                        min="1"
-                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-gray-500 text-sm">
+                                        AI识别食材自动录入，极简管理库存
+                                    </p>
+                                </div>
+                                <Link
+                                    to="/scan"
+                                    className="w-12 h-12 bg-white shadow-md border border-gray-100 rounded-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-transform ml-auto flex-shrink-0"
+                                >
+                                    <ArrowRight
+                                        size={24}
+                                        className="text-primary-600"
                                     />
-                                </div>
-                                <div className="w-20">
-                                    <label className="block text-sm text-gray-600 mb-1">
-                                        单位
-                                    </label>
-                                    <select
-                                        value={newIngredient.unit}
-                                        onChange={(e) =>
-                                            setNewIngredient((prev) => ({
-                                                ...prev,
-                                                unit: e.target.value,
-                                            }))
-                                        }
-                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                    >
-                                        <option value="个">个</option>
-                                        <option value="斤">斤</option>
-                                        <option value="克">克</option>
-                                        <option value="千克">千克</option>
-                                        <option value="毫升">毫升</option>
-                                        <option value="升">升</option>
-                                    </select>
-                                </div>
-                                <div className="w-28">
-                                    <label className="block text-sm text-gray-600 mb-1">
-                                        分类
-                                    </label>
-                                    <select
-                                        value={newIngredient.category}
-                                        onChange={(e) =>
-                                            setNewIngredient((prev) => ({
-                                                ...prev,
-                                                category: e.target.value,
-                                            }))
-                                        }
-                                        className="w-full px-2 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                    >
-                                        <option value="vegetable">蔬菜</option>
-                                        <option value="meat">肉类</option>
-                                        <option value="seafood">海鲜</option>
-                                        <option value="dairy">奶制品</option>
-                                        <option value="egg">蛋类</option>
-                                        <option value="grain">谷物</option>
-                                        <option value="fruit">水果</option>
-                                        <option value="seasoning">
-                                            调味品
-                                        </option>
-                                        <option value="beverage">饮料</option>
-                                        <option value="other">其他</option>
-                                    </select>
-                                </div>
-                                <button
-                                    onClick={handleAddIngredient}
-                                    disabled={
-                                        isAdding || !newIngredient.name.trim()
-                                    }
-                                    className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {isAdding ? "添加中..." : "添加"}
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setShowAddForm(false);
-                                        setNewIngredient({
-                                            name: "",
-                                            quantity: 1,
-                                            unit: "个",
-                                            category: "other",
-                                        });
-                                    }}
-                                    className="p-2 text-gray-500 hover:text-gray-700"
-                                >
-                                    <X size={20} />
-                                </button>
+                                </Link>
                             </div>
-                        </div>
-                    )}
+                        ),
+                    },
+                    {
+                        id: "inventory",
+                        title: "食材库存",
+                        icon: <Carrot size={24} className="text-orange-600" />,
+                        bgBorder: "border-orange-200/60",
+                        content: (
+                            <div className="flex flex-col h-full justify-center px-2 space-y-3 relative z-10 pointer-events-auto">
+                                <div className="flex items-center justify-between">
+                                    <div className="text-sm text-gray-600 font-medium">
+                                        当前库存: {ingredients.length} 种食材
+                                    </div>
+                                    <div className="flex items-center space-x-3">
+                                        <button
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                setShowClearConfirmDialog(true);
+                                            }}
+                                            className="px-3 py-1.5 text-xs text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors font-medium"
+                                        >
+                                            清空
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                setShowAddForm(true);
+                                            }}
+                                            className="px-3 py-1.5 text-xs text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors font-medium"
+                                        >
+                                            添加
+                                        </button>
+                                    </div>
+                                </div>
 
-                    <div className="flex flex-wrap gap-2 max-h-60 overflow-y-auto">
-                        {ingredients.map((ing) => (
-                            <span
-                                key={ing.id}
-                                className={`px-3 py-1.5 rounded-full text-sm font-medium flex items-center space-x-1 ${
-                                    ing.is_expiring_soon
-                                        ? "bg-red-100 text-red-700"
-                                        : "bg-gray-100 text-gray-700"
-                                }`}
-                            >
-                                <span>
-                                    {ing.name} {ing.quantity}
-                                    {ing.unit}
-                                </span>
-                                <button
-                                    onClick={() =>
-                                        handleDeleteIngredient(ing.id!)
-                                    }
-                                    className="ml-1 text-gray-400 hover:text-red-500"
+                                {expiringSoon.length > 0 && (
+                                    <div className="text-xs text-red-600 bg-red-50/80 p-2.5 rounded-lg font-medium flex items-center shadow-sm">
+                                        <ChefHat size={14} className="mr-1.5" />
+                                        {expiringSoon
+                                            .map((i) => i.name)
+                                            .join("、")}{" "}
+                                        即将过期!
+                                    </div>
+                                )}
+
+                                {hasIngredients ? (
+                                    <div className="flex flex-wrap gap-2 overflow-y-auto max-h-20 scrollbar-hide py-1">
+                                        {ingredients.map((ing) => (
+                                            <span
+                                                key={ing.id}
+                                                className={`px-2.5 py-1 rounded-full text-xs shadow-sm border ${ing.is_expiring_soon ? "bg-red-50 border-red-200 text-red-700" : "bg-white border-gray-200 text-gray-700"}`}
+                                            >
+                                                {ing.name} {ing.quantity}
+                                                {ing.unit}
+                                            </span>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-2 text-sm text-gray-400">
+                                        空空如也，扫描一下冰箱吧
+                                    </div>
+                                )}
+                            </div>
+                        ),
+                    },
+                    {
+                        id: "recommend",
+                        title: "推荐菜谱",
+                        icon: (
+                            <Utensils size={24} className="text-accent-600" />
+                        ),
+                        bgBorder: "border-accent-200/60",
+                        content: (
+                            <div className="flex items-center space-x-3 h-full px-2">
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-gray-500 text-sm">
+                                        不知道吃什么？根据现有食材为您推荐精选菜谱。
+                                    </p>
+                                </div>
+                                <Link
+                                    to="/cook/recommendations"
+                                    className="px-5 py-3 bg-accent-100/80 text-accent-700 hover:bg-accent-200 rounded-xl font-medium text-sm transition-colors shadow-sm"
                                 >
-                                    <X size={14} />
-                                </button>
-                            </span>
-                        ))}
-                    </div>
-
-                    <section className="mt-8">
-                        <Link
-                            to="/food/shopping"
-                            className="flex items-center justify-between group"
-                        >
-                            <h2 className="text-lg md:text-xl font-semibold text-gray-800 group-hover:text-primary-600 transition-colors">
-                                我的采购清单
-                            </h2>
-                            <span className="text-primary-600 text-sm opacity-0 group-hover:opacity-100 transition-opacity">
-                                进入 →
-                            </span>
-                        </Link>
-
-                        {shoppingLists.length > 0 ? (
-                            <div className="space-y-4 mt-4">
-                                {shoppingLists.slice(0, 3).map((list) => (
-                                    <div
-                                        key={list.id}
-                                        className="p-4 bg-orange-50 rounded-lg"
+                                    浏览菜谱
+                                </Link>
+                            </div>
+                        ),
+                    },
+                    {
+                        id: "shopping",
+                        title: "采购清单",
+                        icon: (
+                            <ShoppingCart
+                                size={24}
+                                className="text-orange-600"
+                            />
+                        ),
+                        bgBorder: "border-orange-200/60",
+                        content: (
+                            <div className="flex flex-col h-full justify-center px-2 space-y-3 pointer-events-auto relative z-10">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-sm font-medium text-gray-600">
+                                        待采购{" "}
+                                        <span className="text-orange-600 font-bold">
+                                            {pendingPurchaseCount}
+                                        </span>{" "}
+                                        项商品
+                                    </span>
+                                    <Link
+                                        to="/food/shopping"
+                                        className="text-xs font-medium text-orange-700 px-3 py-1.5 bg-orange-100/80 hover:bg-orange-200 rounded-lg transition-colors"
                                     >
-                                        <div className="flex items-center space-x-2 mb-2">
-                                            <ShoppingCart
-                                                size={16}
-                                                className="text-orange-600"
-                                            />
-                                            {list.recipe_id ? (
-                                                <Link
-                                                    to={`/cook/recommendations/${list.recipe_id}`}
-                                                    className="font-medium text-gray-800 hover:text-primary-600"
-                                                >
-                                                    {list.recipe_title ||
-                                                        "未知菜谱"}
-                                                </Link>
-                                            ) : (
-                                                <span className="font-medium text-gray-800">
-                                                    {list.recipe_title ||
-                                                        "未知菜谱"}
-                                                </span>
-                                            )}
+                                        前往采购
+                                    </Link>
+                                </div>
+                                {shoppingLists.length > 0 ? (
+                                    <div className="text-sm text-gray-700 bg-white/60 border border-orange-100 shadow-sm p-3 rounded-xl overflow-hidden">
+                                        <div className="font-medium truncate text-orange-800 mb-1">
+                                            {shoppingLists[0].recipe_title ||
+                                                "日常缺食"}
                                         </div>
-                                        <div className="flex flex-wrap gap-2">
-                                            {list.items.map(
-                                                (item: any, idx: number) => (
-                                                    <span
-                                                        key={idx}
-                                                        className={`inline-flex items-center space-x-1 text-sm px-2 py-1 rounded-full ${
-                                                            isItemCompleted(item)
-                                                                ? "bg-green-100 text-gray-400 line-through"
-                                                                : "bg-orange-100 text-gray-700"
-                                                        }`}
-                                                    >
-                                                        <div
-                                                            className={`w-3 h-3 rounded-full border flex items-center justify-center ${
-                                                                isItemCompleted(item)
-                                                                    ? "bg-green-500 border-green-500"
-                                                                    : "border-orange-300"
-                                                            }`}
-                                                        >
-                                                            {isItemCompleted(item) && (
-                                                                <Check
-                                                                    size={8}
-                                                                    className="text-white"
-                                                                />
-                                                            )}
-                                                        </div>
-                                                        <span>
-                                                            {getItemName(item)}
-                                                        </span>
-                                                    </span>
-                                                ),
-                                            )}
+                                        <div className="truncate text-xs text-gray-500">
+                                            {shoppingLists[0].items
+                                                .filter(
+                                                    (i: any) =>
+                                                        !isItemCompleted(i),
+                                                )
+                                                .map((i: any) => getItemName(i))
+                                                .join(", ")}
                                         </div>
                                     </div>
-                                ))}
+                                ) : (
+                                    <div className="text-center py-2 text-sm text-gray-400">
+                                        所有采购已完成
+                                    </div>
+                                )}
                             </div>
-                        ) : (
-                            <p className="text-gray-500 text-sm mt-4">
-                                暂无待采购的食材
-                            </p>
-                        )}
-                    </section>
-                </section>
-            )}
+                        ),
+                    },
+                    {
+                        id: "stats",
+                        title: "今日统计",
+                        icon: <PieChart size={24} className="text-blue-600" />,
+                        bgBorder: "border-blue-200/60",
+                        content: (
+                            <div className="grid grid-cols-3 gap-3 h-full items-center px-2 py-2">
+                                <div className="bg-white/50 backdrop-blur-sm rounded-xl p-3 text-center shadow-sm border border-gray-100">
+                                    <div className="text-xl font-bold text-primary-600 mb-1">
+                                        {ingredients.length}
+                                    </div>
+                                    <div className="text-xs font-medium text-gray-500">
+                                        库存
+                                    </div>
+                                </div>
+                                <div className="bg-white/50 backdrop-blur-sm rounded-xl p-3 text-center shadow-sm border border-gray-100">
+                                    <div className="text-xl font-bold text-accent-600 mb-1">
+                                        {recipePages.length > 0
+                                            ? recipePages.reduce(
+                                                  (t, p) => t + p.length,
+                                                  0,
+                                              )
+                                            : recommendations.length}
+                                    </div>
+                                    <div className="text-xs font-medium text-gray-500">
+                                        推荐
+                                    </div>
+                                </div>
+                                <div className="bg-white/50 backdrop-blur-sm rounded-xl p-3 text-center shadow-sm border border-gray-100">
+                                    <div className="text-xl font-bold text-orange-500 mb-1">
+                                        {pendingPurchaseCount}
+                                    </div>
+                                    <div className="text-xs font-medium text-gray-500">
+                                        待买
+                                    </div>
+                                </div>
+                            </div>
+                        ),
+                    },
+                    {
+                        id: "profile",
+                        title: "个性设置",
+                        icon: <Settings size={24} className="text-gray-600" />,
+                        bgBorder: "border-gray-200/60",
+                        content: (
+                            <div className="flex items-center space-x-4 h-full px-2 pointer-events-auto relative z-10">
+                                <div className="flex-1 space-y-2">
+                                    <div className="text-xs text-gray-500 flex items-center">
+                                        <Sparkles
+                                            size={14}
+                                            className="mr-1.5 text-yellow-500"
+                                        />{" "}
+                                        点击卡片查看完整内容
+                                    </div>
+                                    <div className="text-xs text-gray-500 flex items-center">
+                                        <Sparkles
+                                            size={14}
+                                            className="mr-1.5 text-yellow-500"
+                                        />{" "}
+                                        自定义您的口味偏好
+                                    </div>
+                                </div>
+                                <Link
+                                    to="/profile"
+                                    className="px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium text-sm transition-colors"
+                                >
+                                    个性化设置
+                                </Link>
+                            </div>
+                        ),
+                    },
+                ].map((card, index, arr) => {
+                    const isActive = index === activeIndex;
+                    const activeDescription =
+                        cardDescriptions[card.id] ??
+                        "查看该卡片的核心信息与操作入口。";
+                    const activeAction = cardActions[card.id] ?? {
+                        to: "/home",
+                        label: "进入功能",
+                    };
+                    const activeActionStyle =
+                        cardActionStyles[card.id] ??
+                        "bg-primary-400 hover:bg-primary-500";
 
-            {!hasIngredients && (
-                <section className="card p-8 text-center">
-                    <div className="w-20 h-20 bg-gradient-to-br from-primary-100 to-primary-200 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Scan size={40} className="text-primary-600" />
-                    </div>
-                    <h3 className="text-xl font-semibold text-gray-800 mb-2">
-                        开始使用
-                    </h3>
-                    <p className="text-gray-500 mb-6 max-w-md mx-auto">
-                        扫描你的冰箱或食材，系统将智能识别并推荐最适合的菜谱
-                    </p>
-                    <div className="flex justify-center space-x-4">
-                        <Link to="/scan" className="btn-primary">
-                            立即扫描
-                        </Link>
-                        <Link to="/cook/recommendations" className="btn-secondary">
-                            浏览菜谱
-                        </Link>
-                    </div>
-                </section>
-            )}
+                    // --- STACKING MATH LOGIC ---
+                    const CARD_HEIGHT = 180;
+                    const VISIBLE_HEIGHT = CARD_HEIGHT * 0.4; // overlap 60%
+                    // Reserve space for the page title while keeping the stack near bottom nav.
+                    const STACK_BASE_OFFSET = 96;
 
-            <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="card p-5 md:p-6">
-                    <h3 className="text-base md:text-lg font-semibold text-gray-800 mb-3">
-                        💡 使用技巧
-                    </h3>
-                    <ul className="space-y-2 text-gray-600 text-sm">
-                        <li className="flex items-start space-x-2">
-                            <span className="text-primary-600">•</span>
-                            <span>定期扫描冰箱，保持食材库存最新</span>
-                        </li>
-                        <li className="flex items-start space-x-2">
-                            <span className="text-primary-600">•</span>
-                            <span>设置口味偏好，获得更精准的推荐</span>
-                        </li>
-                        <li className="flex items-start space-x-2">
-                            <span className="text-primary-600">•</span>
-                            <span>烹饪时使用语音控制，解放双手</span>
-                        </li>
-                    </ul>
-                </div>
+                    // 当前激活卡片视为堆叠中的第 0 层，其余卡片顺延
+                    const stackIndex = isActive
+                        ? 0
+                        : index < activeIndex
+                          ? index + 1
+                          : index;
 
-                <div className="card p-5 md:p-6">
-                    <h3 className="text-base md:text-lg font-semibold text-gray-800 mb-3">
-                        🎯 今日统计
-                    </h3>
-                    <div className="grid grid-cols-3 gap-4 text-center">
-                        <div>
-                            <div className="text-2xl font-bold text-primary-600">
-                                {ingredients.length}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                                食材数量
-                            </div>
+                    // 所有卡片都保持在同一堆叠体系中，非单独抽离显示
+                    const translateY =
+                        STACK_BASE_OFFSET + stackIndex * VISIBLE_HEIGHT;
+
+                    const cardOpacity = Math.max(0.72, 1 - stackIndex * 0.06);
+
+                    return (
+                        <div
+                            key={card.id}
+                            onClick={() => {
+                                if (!isActive) setActiveIndex(index);
+                            }}
+                            className={`absolute left-0 right-0 rounded-3xl transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] shadow-[0_8px_30px_rgb(0,0,0,0.12)] overflow-hidden cursor-pointer backdrop-blur-xl bg-white/70 ${isActive ? `border-2 ${card.bgBorder}` : "border border-gray-200/70"}`}
+                            style={{
+                                height: `${CARD_HEIGHT}px`,
+                                transform: `translateY(${translateY}px)`,
+                                opacity: cardOpacity,
+                                zIndex: arr.length - stackIndex,
+                            }}
+                        >
+                            {isActive ? (
+                                <div className="h-full flex items-center px-6 py-5 bg-white/60 transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)]">
+                                    <div className="w-20 h-20 rounded-2xl bg-white/90 border border-gray-100 shadow-sm flex items-center justify-center flex-shrink-0">
+                                        <div className="scale-[1.8]">
+                                            {card.icon}
+                                        </div>
+                                    </div>
+                                    <div className="ml-5 flex-1 min-w-0">
+                                        <h3 className="font-bold text-gray-800 tracking-wide text-xl truncate">
+                                            {card.title}
+                                        </h3>
+                                        <p className="mt-2 text-sm text-gray-500 leading-relaxed line-clamp-3">
+                                            {activeDescription}
+                                        </p>
+                                    </div>
+                                    <Link
+                                        to={activeAction.to}
+                                        aria-label={activeAction.label}
+                                        title={activeAction.label}
+                                        className={`ml-4 w-11 h-11 rounded-full text-white flex items-center justify-center shadow-md transition-colors flex-shrink-0 ${activeActionStyle}`}
+                                    >
+                                        <ArrowRight size={18} />
+                                    </Link>
+                                </div>
+                            ) : (
+                                <div className="absolute inset-x-0 bottom-0 h-1/3 flex items-center px-4 bg-white/65 backdrop-blur-xl border-t border-white/70 transition-all duration-500">
+                                    <div className="p-1.5 rounded-lg bg-white/80 shadow-sm mr-2.5 opacity-80 transition-all duration-500 flex-shrink-0">
+                                        {card.icon}
+                                    </div>
+                                    <h3 className="font-semibold text-gray-700 text-base tracking-wide truncate opacity-90">
+                                        {card.title}
+                                    </h3>
+                                </div>
+                            )}
+
+                            {!isActive && null}
                         </div>
-                        <div>
-                            <div className="text-2xl font-bold text-accent-600">
-                                {recipePages.length > 0
-                                    ? recipePages.reduce(
-                                          (total, page) => total + page.length,
-                                          0,
-                                      )
-                                    : recommendations.length}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                                推荐菜谱
-                            </div>
-                        </div>
-                        <div>
-                            <div className="text-2xl font-bold text-purple-600">
-                                {pendingPurchaseCount}
-                            </div>
-                            <div className="text-sm text-gray-500">待采购</div>
-                        </div>
-                    </div>
-                </div>
-            </section>
+                    );
+                })}
+            </div>
 
             {showRecipeRefreshDialog && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
-                        <div className="text-center mb-6">
-                            <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] animate-fade-in px-4">
+                    <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl">
+                        <div className="text-center mb-8">
+                            <div className="w-20 h-20 bg-primary-50 rounded-full flex items-center justify-center mx-auto mb-5">
                                 <RefreshCw
-                                    size={32}
+                                    size={40}
                                     className="text-primary-600"
                                 />
                             </div>
-                            <h3 className="text-lg md:text-xl font-bold text-gray-800 mb-2">
-                                食材已更改
+                            <h3 className="text-2xl font-bold text-gray-800 mb-3">
+                                库存已更新
                             </h3>
-                            <p className="text-sm md:text-base text-gray-600">
-                                您的食材库存已更新，是否要重新生成菜谱推荐？
+                            <p className="text-gray-500">
+                                重新生成菜谱以获取最新美食推荐
                             </p>
                         </div>
-                        <div className="flex space-x-3">
+                        <div className="flex space-x-4">
                             <button
                                 onClick={() =>
                                     setShowRecipeRefreshDialog(false)
                                 }
-                                className="flex-1 px-6 py-3 border border-gray-300 rounded-xl font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                                className="flex-1 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-colors"
                             >
                                 稍后再说
                             </button>
@@ -598,9 +493,9 @@ export default function HomePage() {
                                     requestRecipeForceRefresh();
                                     navigate("/cook/recommendations");
                                 }}
-                                className="flex-1 px-6 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors"
+                                className="flex-1 py-3.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-medium shadow-md shadow-primary-200 transition-colors"
                             >
-                                重新推荐
+                                立即推荐
                             </button>
                         </div>
                     </div>
@@ -608,23 +503,23 @@ export default function HomePage() {
             )}
 
             {showClearConfirmDialog && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
-                        <div className="text-center mb-6">
-                            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <Trash2 size={32} className="text-red-600" />
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] animate-fade-in px-4">
+                    <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl">
+                        <div className="text-center mb-8">
+                            <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-5">
+                                <Trash2 size={40} className="text-red-500" />
                             </div>
-                            <h3 className="text-xl font-bold text-gray-800 mb-2">
-                                清空食材
+                            <h3 className="text-2xl font-bold text-gray-800 mb-3">
+                                清空全部食材?
                             </h3>
-                            <p className="text-gray-600">
-                                确定要清空所有食材及菜谱推荐吗？此操作不可恢复。
+                            <p className="text-gray-500">
+                                一旦清空，所有食材和相应的菜谱推荐不可恢复。
                             </p>
                         </div>
-                        <div className="flex space-x-3">
+                        <div className="flex space-x-4">
                             <button
                                 onClick={() => setShowClearConfirmDialog(false)}
-                                className="flex-1 px-6 py-3 border border-gray-300 rounded-xl font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                                className="flex-1 py-3.5 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl font-medium transition-colors"
                             >
                                 取消
                             </button>
@@ -635,9 +530,97 @@ export default function HomePage() {
                                     clearRecommendations();
                                     clearRecipeCacheDirty();
                                 }}
-                                className="flex-1 px-6 py-3 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-colors"
+                                className="flex-1 py-3.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-medium shadow-md shadow-red-200 transition-colors"
                             >
-                                确定清空
+                                清空
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showAddForm && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-[100] animate-fade-in">
+                    <div className="bg-white rounded-t-3xl sm:rounded-3xl p-6 sm:p-8 w-full max-w-sm shadow-2xl animate-fade-in-up">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-bold text-gray-800">
+                                快速添加食材
+                            </h3>
+                            <button
+                                onClick={() => setShowAddForm(false)}
+                                className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
+                            >
+                                <X size={20} className="text-gray-500" />
+                            </button>
+                        </div>
+
+                        <div className="flex flex-col space-y-4">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5 ml-1">
+                                    食材名称
+                                </label>
+                                <input
+                                    type="text"
+                                    value={newIngredient.name}
+                                    onChange={(e) =>
+                                        setNewIngredient((prev: any) => ({
+                                            ...prev,
+                                            name: e.target.value,
+                                        }))
+                                    }
+                                    placeholder="比如：西红柿"
+                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all"
+                                />
+                            </div>
+
+                            <div className="flex space-x-3">
+                                <div className="flex-1">
+                                    <label className="block text-xs font-medium text-gray-500 mb-1.5 ml-1">
+                                        数量
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={newIngredient.quantity}
+                                        onChange={(e) =>
+                                            setNewIngredient((prev: any) => ({
+                                                ...prev,
+                                                quantity:
+                                                    parseFloat(
+                                                        e.target.value,
+                                                    ) || 1,
+                                            }))
+                                        }
+                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all font-medium"
+                                    />
+                                </div>
+                                <div className="w-24">
+                                    <label className="block text-xs font-medium text-gray-500 mb-1.5 ml-1">
+                                        单位
+                                    </label>
+                                    <select
+                                        value={newIngredient.unit}
+                                        onChange={(e) =>
+                                            setNewIngredient((prev: any) => ({
+                                                ...prev,
+                                                unit: e.target.value,
+                                            }))
+                                        }
+                                        className="w-full px-3 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all appearance-none font-medium"
+                                    >
+                                        <option value="个">个</option>
+                                        <option value="斤">斤</option>
+                                        <option value="克">克</option>
+                                        <option value="千克">千克</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={handleAddIngredient}
+                                disabled={isAdding || !newIngredient.name}
+                                className={`w-full py-4 mt-4 rounded-xl font-bold text-white transition-all shadow-lg ${isAdding || !newIngredient.name ? "bg-primary-300 shadow-none cursor-not-allowed" : "bg-primary-500 hover:bg-primary-600 hover:-translate-y-0.5 active:translate-y-0 shadow-primary-200"}`}
+                            >
+                                {isAdding ? "处理中..." : "确认添加"}
                             </button>
                         </div>
                     </div>
