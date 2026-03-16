@@ -18,6 +18,7 @@ import { cookingApi } from '../services/api';
 import { useCookingStore } from '../stores';
 import { getUserId } from '../utils/userId';
 import type { CookingSession } from '../types';
+import { addCookingHistory } from '../services/cookingLibrary';
 
 const voiceCommands = [
   '下一步',
@@ -359,6 +360,7 @@ export default function CookingPage() {
     if (!session) return;
     try {
       await cookingApi.completeSession(session.id, getUserId());
+      addCookingHistory(session, elapsedTime);
       const updatedSession = { ...session, status: 'completed' as const };
       setSession(updatedSession);
       setGlobalSession(updatedSession);

@@ -252,14 +252,22 @@ export default function RecipesPage() {
     fetchRecipes(excludedIngredients, true);
   }, [fetchRecipes, excludedIngredients]);
 
+  const isLoadingRecipes =
+    isLoading || isLoadingFromDb || (isFirstTimeLoading && availableIngredientNames.length > 0);
+  const isAiGenerating = isLoading;
+
   return (
     <div className="space-y-6 animate-fade-in">
-      {isLoading || isLoadingFromDb || (isFirstTimeLoading && availableIngredientNames.length > 0) ? (
+      {isLoadingRecipes ? (
         <div className="flex justify-center py-8 md:py-12">
           <div className="text-center">
             <div className="animate-spin rounded-full h-10 w-10 md:h-12 md:w-12 border-b-2 border-primary-500 mx-auto mb-3 md:mb-4" />
-            <p className="text-gray-600 text-sm md:text-base">AI 正在为您设计四菜一汤...</p>
-            <p className="text-gray-400 text-xs md:text-sm mt-1">这可能需要几秒钟</p>
+            <p className="text-gray-600 text-sm md:text-base">
+              {isAiGenerating ? 'AI 正在为您设计四菜一汤...' : '正在加载菜谱...'}
+            </p>
+            <p className="text-gray-400 text-xs md:text-sm mt-1">
+              {isAiGenerating ? '这可能需要几秒钟' : '请稍候'}
+            </p>
           </div>
         </div>
       ) : availableIngredientNames.length === 0 ? (

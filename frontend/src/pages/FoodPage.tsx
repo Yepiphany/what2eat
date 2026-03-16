@@ -124,7 +124,6 @@ export default function FoodPage() {
             </div>
             <div>
               <h2 className="font-semibold text-gray-800">继续扫描入库</h2>
-              <p className="text-sm text-gray-500">拍照识别并写入库存</p>
             </div>
           </div>
         </Link>
@@ -139,7 +138,6 @@ export default function FoodPage() {
             </div>
             <div>
               <h2 className="font-semibold text-gray-800">查看采购清单</h2>
-              <p className="text-sm text-gray-500">统一处理缺失食材采购</p>
             </div>
           </div>
         </Link>
@@ -322,7 +320,7 @@ export default function FoodPage() {
                   库存已更新
                 </h3>
                 <p className="text-sm md:text-base text-gray-600">
-                  是否现在刷新推荐菜谱，保持烹饪链路一致？
+                  是否现在刷新推荐菜谱？
                 </p>
               </div>
               <div className="flex space-x-3">

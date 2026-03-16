@@ -1,28 +1,47 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { useNavigate } from "react-router-dom";
-import { ChefHat, Clock3, PlayCircle, Sparkles } from "lucide-react";
-import { useCookingStore, useIngredientsStore, useRecipesStore } from "../stores";
+import { BookHeart, ChefHat, Clock3, Flame, History, PlayCircle } from "lucide-react";
+import { useCookingStore, useRecipesStore } from "../stores";
 import {
-    RECIPE_CACHE_DIRTY_EVENT,
-    isRecipeCacheDirty,
-    requestRecipeForceRefresh,
-} from "../services/recipeCache";
+    COOKING_HISTORY_UPDATED_EVENT,
+    FAVORITES_UPDATED_EVENT,
+    getCookingHistory,
+    getFavoriteRecipes,
+    type CookingHistoryItem,
+    type FavoriteRecipeItem,
+} from "../services/cookingLibrary";
+import RecipesPage from "./RecipesPage";
+
+const difficultyLabels: Record<string, string> = {
+    easy: "简单",
+    medium: "中等",
+    hard: "困难",
+};
+
+type CookTab = "recommendations" | "cooking" | "history" | "favorites";
 
 export default function CookHubPage() {
-    const navigate = useNavigate();
     const { currentSession } = useCookingStore();
-    const { ingredients } = useIngredientsStore();
     const { recipePages, recommendations } = useRecipesStore();
-    const [cacheDirty, setCacheDirty] = useState(isRecipeCacheDirty());
+
+    const [activeTab, setActiveTab] = useState<CookTab>("recommendations");
+    const [historyRecords, setHistoryRecords] = useState<CookingHistoryItem[]>(() => getCookingHistory());
+    const [favoriteRecipes, setFavoriteRecipes] = useState<FavoriteRecipeItem[]>(() => getFavoriteRecipes());
 
     useEffect(() => {
-        const syncDirtyState = () => setCacheDirty(isRecipeCacheDirty());
-        window.addEventListener(RECIPE_CACHE_DIRTY_EVENT, syncDirtyState);
-        window.addEventListener("storage", syncDirtyState);
+        const syncHistory = () => setHistoryRecords(getCookingHistory());
+        const syncFavorites = () => setFavoriteRecipes(getFavoriteRecipes());
+
+        window.addEventListener("storage", syncHistory);
+        window.addEventListener("storage", syncFavorites);
+        window.addEventListener(COOKING_HISTORY_UPDATED_EVENT, syncHistory);
+        window.addEventListener(FAVORITES_UPDATED_EVENT, syncFavorites);
+
         return () => {
-            window.removeEventListener(RECIPE_CACHE_DIRTY_EVENT, syncDirtyState);
-            window.removeEventListener("storage", syncDirtyState);
+            window.removeEventListener("storage", syncHistory);
+            window.removeEventListener("storage", syncFavorites);
+            window.removeEventListener(COOKING_HISTORY_UPDATED_EVENT, syncHistory);
+            window.removeEventListener(FAVORITES_UPDATED_EVENT, syncFavorites);
         };
     }, []);
 
@@ -32,102 +51,160 @@ export default function CookHubPage() {
     const hasActiveSession =
         currentSession && currentSession.status !== "completed" && currentSession.recipe_id;
 
+    const tabs: Array<{ key: CookTab; label: string; count: number }> = [
+        { key: "recommendations", label: "推荐菜谱", count: recommendationCount },
+        { key: "cooking", label: "烹饪", count: hasActiveSession ? 1 : 0 },
+        { key: "history", label: "历史记录", count: historyRecords.length },
+        { key: "favorites", label: "收藏", count: favoriteRecipes.length },
+    ];
+
     return (
         <div className="space-y-6 animate-fade-in">
-            <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Link
-                    to="/cook/recommendations"
-                    className="card p-5 border-2 border-transparent hover:border-accent-500 transition-colors"
-                >
-                    <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-xl bg-accent-100 text-accent-700 flex items-center justify-center">
-                            <Sparkles size={22} />
-                        </div>
-                        <div>
-                            <h2 className="font-semibold text-gray-800">查看推荐菜谱</h2>
-                            <p className="text-sm text-gray-500">
-                                当前可浏览 {recommendationCount} 道菜谱
-                                {cacheDirty ? "（库存已变更，建议刷新）" : ""}
-                            </p>
-                        </div>
-                    </div>
-                </Link>
-
-                {hasActiveSession ? (
-                    <Link
-                        to={`/cook/session/${currentSession.recipe_id}`}
-                        className="card p-5 border-2 border-transparent hover:border-primary-500 transition-colors"
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className="w-11 h-11 rounded-xl bg-primary-100 text-primary-600 flex items-center justify-center">
-                                <PlayCircle size={22} />
-                            </div>
-                            <div>
-                                <h2 className="font-semibold text-gray-800">继续当前烹饪</h2>
-                                <p className="text-sm text-gray-500 truncate">
-                                    {currentSession.recipe_title || "继续上次菜谱"}
-                                </p>
-                            </div>
-                        </div>
-                    </Link>
-                ) : (
-                    <div className="card p-5 border border-dashed border-gray-300">
-                        <div className="flex items-center gap-3">
-                            <div className="w-11 h-11 rounded-xl bg-gray-100 text-gray-500 flex items-center justify-center">
-                                <Clock3 size={22} />
-                            </div>
-                            <div>
-                                <h2 className="font-semibold text-gray-700">暂无进行中烹饪</h2>
-                                <p className="text-sm text-gray-500">从推荐列表选择一道菜开始</p>
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </section>
-
-            <section className="card p-5 md:p-6">
-                <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2 mb-3">
-                    <ChefHat size={20} className="text-primary-600" />
-                    链路状态
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-                    <div className="rounded-lg bg-gray-50 p-3">
-                        <p className="text-gray-500">库存食材</p>
-                        <p className="mt-1 text-xl font-semibold text-gray-800">{ingredients.length}</p>
-                    </div>
-                    <div className="rounded-lg bg-gray-50 p-3">
-                        <p className="text-gray-500">推荐菜谱</p>
-                        <p className="mt-1 text-xl font-semibold text-gray-800">{recommendationCount}</p>
-                    </div>
-                    <div className="rounded-lg bg-gray-50 p-3">
-                        <p className="text-gray-500">烹饪状态</p>
-                        <p className="mt-1 text-xl font-semibold text-gray-800">
-                            {hasActiveSession ? "进行中" : "待开始"}
-                        </p>
-                    </div>
+            <section className="overflow-x-auto">
+                <div className="flex min-w-max gap-4 border-b border-gray-200">
+                    {tabs.map((tab) => {
+                        const isActive = activeTab === tab.key;
+                        return (
+                            <button
+                                key={tab.key}
+                                onClick={() => setActiveTab(tab.key)}
+                                className={`-mb-px border-b-2 px-1 pb-3 text-sm md:text-base font-semibold transition-colors ${
+                                    isActive
+                                        ? "border-primary-500 text-primary-600"
+                                        : "border-transparent text-gray-500 hover:text-gray-700"
+                                }`}
+                            >
+                                <span>{tab.label}</span>
+                                <span className={`ml-2 text-xs ${isActive ? "text-primary-500" : "text-gray-400"}`}>
+                                    {tab.count}
+                                </span>
+                            </button>
+                        );
+                    })}
                 </div>
-
-                {ingredients.length === 0 && (
-                    <div className="mt-4 p-3 rounded-lg bg-orange-50 border border-orange-100 text-orange-700 text-sm">
-                        当前库存为空，建议先前往扫描页完成入库再获取更准确推荐。
-                    </div>
-                )}
-
-                {cacheDirty && ingredients.length > 0 && (
-                    <div className="mt-4 p-3 rounded-lg bg-yellow-50 border border-yellow-200 text-yellow-800 text-sm flex items-center justify-between gap-3">
-                        <span>检测到库存变化，当前推荐可能已过期。</span>
-                        <button
-                            onClick={() => {
-                                requestRecipeForceRefresh();
-                                navigate("/cook/recommendations");
-                            }}
-                            className="px-3 py-1.5 rounded-md bg-yellow-500 text-white hover:bg-yellow-600 transition-colors"
-                        >
-                            立即刷新
-                        </button>
-                    </div>
-                )}
             </section>
+
+            {activeTab === "recommendations" && (
+                <RecipesPage />
+            )}
+
+            {activeTab === "cooking" && (
+                <section className="card p-5 md:p-6 space-y-4">
+                    <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                        <Flame size={20} className="text-primary-600" />
+                        烹饪
+                    </h2>
+
+                    {hasActiveSession ? (
+                        <div className="rounded-xl border border-primary-200 bg-primary-50 p-4 md:p-5">
+                            <p className="text-sm text-primary-700 mb-1">正在进行</p>
+                            <p className="text-lg font-semibold text-gray-800">{currentSession.recipe_title || "继续上次菜谱"}</p>
+                            <p className="text-sm text-gray-600 mt-1">
+                                当前步骤：第 {currentSession.current_step + 1} 步
+                                {currentSession.steps.length > 0 ? ` / 共 ${currentSession.steps.length} 步` : ""}
+                            </p>
+                            <Link
+                                to={`/cook/session/${currentSession.recipe_id}`}
+                                className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600 transition-colors"
+                            >
+                                <PlayCircle size={18} />
+                                继续当前烹饪
+                            </Link>
+                        </div>
+                    ) : (
+                        <div className="rounded-xl border border-dashed border-gray-300 p-6 text-center">
+                            <Clock3 size={28} className="mx-auto text-gray-400 mb-3" />
+                            <p className="font-medium text-gray-700">暂无进行中的烹饪</p>
+                            <p className="text-sm text-gray-500 mt-1">从推荐菜谱中选择一道菜开始吧</p>
+                            <button
+                                onClick={() => setActiveTab("recommendations")}
+                                className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600 transition-colors"
+                            >
+                                <ChefHat size={18} />
+                                去选菜谱
+                            </button>
+                        </div>
+                    )}
+                </section>
+            )}
+
+            {activeTab === "history" && (
+                <section className="card p-5 md:p-6 space-y-4">
+                    <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                        <History size={20} className="text-gray-700" />
+                        最近烹饪历史
+                    </h2>
+
+                    {historyRecords.length > 0 ? (
+                        <div className="space-y-3">
+                            {historyRecords.map((item) => (
+                                <div
+                                    key={item.session_id}
+                                    className="rounded-xl border border-gray-200 p-4 flex items-start justify-between gap-3"
+                                >
+                                    <div>
+                                        <p className="font-semibold text-gray-800">{item.recipe_title}</p>
+                                        <p className="text-sm text-gray-500 mt-1">
+                                            完成于 {new Date(item.completed_at).toLocaleString()}
+                                        </p>
+                                        <p className="text-sm text-gray-500 mt-1">
+                                            耗时 {formatElapsed(item.elapsed_seconds)}
+                                        </p>
+                                    </div>
+                                    <Link
+                                        to={`/cook/recommendations/${item.recipe_id}`}
+                                        className="text-sm px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                                    >
+                                        查看菜谱
+                                    </Link>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="rounded-xl bg-gray-50 p-6 text-center text-gray-500">
+                            暂无烹饪历史，完成一次烹饪后会出现在这里。
+                        </div>
+                    )}
+                </section>
+            )}
+
+            {activeTab === "favorites" && (
+                <section className="card p-5 md:p-6 space-y-4">
+                    <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                        <BookHeart size={20} className="text-red-500" />
+                        我的收藏菜谱
+                    </h2>
+
+                    {favoriteRecipes.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {favoriteRecipes.map((item) => (
+                                <Link
+                                    key={item.id}
+                                    to={`/cook/recommendations/${item.id}`}
+                                    className="rounded-xl border border-gray-200 p-4 hover:border-primary-500 hover:shadow-md transition-all"
+                                >
+                                    <p className="font-semibold text-gray-800 line-clamp-1">{item.title}</p>
+                                    <p className="text-sm text-gray-500 mt-2">收藏于 {new Date(item.saved_at).toLocaleDateString()}</p>
+                                    <p className="text-sm text-gray-500 mt-1">
+                                        {item.cooking_time} 分钟 · {difficultyLabels[item.difficulty] || item.difficulty}
+                                    </p>
+                                </Link>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="rounded-xl bg-gray-50 p-6 text-center text-gray-500">
+                            暂无收藏菜谱，去菜谱详情点亮收藏即可在这里查看。
+                        </div>
+                    )}
+                </section>
+            )}
         </div>
     );
+}
+
+function formatElapsed(seconds: number): string {
+    const total = Math.max(0, Math.floor(seconds));
+    const mins = Math.floor(total / 60);
+    const secs = total % 60;
+    return `${mins}分${secs.toString().padStart(2, "0")}秒`;
 }

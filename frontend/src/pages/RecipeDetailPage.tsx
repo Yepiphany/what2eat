@@ -17,6 +17,7 @@ import { recipeApi } from '../services/api';
 import { getUserId } from '../utils/userId';
 import type { Recipe } from '../types';
 import { incrementViewedRecipes } from '../services/statistics';
+import { isRecipeFavorited, toggleFavoriteRecipe } from '../services/cookingLibrary';
 
 const difficultyLabels = {
   easy: { text: '简单', color: 'bg-green-100 text-green-700' },
@@ -93,6 +94,7 @@ export default function RecipeDetailPage() {
     try {
       const data = await recipeApi.getRecipe(recipeId);
       setRecipe(data);
+      setIsFavorite(isRecipeFavorited(data.id));
     } catch (error) {
       console.error('Failed to fetch recipe:', error);
     } finally {
@@ -127,7 +129,11 @@ export default function RecipeDetailPage() {
   };
 
   const toggleFavorite = () => {
-    setIsFavorite(!isFavorite);
+    if (!recipe) {
+      return;
+    }
+    const next = toggleFavoriteRecipe(recipe);
+    setIsFavorite(next);
   };
 
   const handleAddToShoppingList = async () => {
