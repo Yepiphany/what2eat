@@ -61,6 +61,7 @@ class RecipeResponse(RecipeBase):
 
 class RecipeRecommendationRequest(BaseModel):
     available_ingredients: List[str]
+    preset_ingredients: List[str] = []
     taste_preferences: List[TastePreference] = []
     diet_type: Optional[DietType] = None
     max_cooking_time: Optional[int] = None

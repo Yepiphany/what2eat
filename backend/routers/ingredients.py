@@ -14,6 +14,17 @@ supabase = get_supabase_client()
 FALLBACK_INGREDIENTS: list = []
 KNOWN_USERS: set[str] = set()
 
+INGREDIENT_PRESETS: dict[str, List[str]] = {
+    "蔬菜": ["土豆", "西红柿", "黄瓜", "胡萝卜", "洋葱", "青椒", "西兰花", "生菜"],
+    "肉类": ["鸡胸肉", "猪里脊", "牛肉", "五花肉", "鸡腿", "排骨"],
+    "海鲜": ["虾", "鱼片", "鱿鱼", "扇贝"],
+    "豆制品": ["豆腐", "嫩豆腐", "豆干", "腐竹"],
+    "蛋奶": ["鸡蛋", "牛奶", "芝士"],
+    "主食": ["米饭", "面条", "意面", "土豆泥"],
+    "菌菇": ["香菇", "金针菇", "杏鲍菇", "蘑菇"],
+    "调味": ["葱", "姜", "蒜", "生抽", "蚝油", "豆瓣酱", "咖喱", "孜然"],
+}
+
 def ensure_user_exists(user_id: str) -> bool:
     """Check if user exists, if not create a placeholder user"""
     try:
@@ -62,6 +73,11 @@ async def scan_ingredients_base64(request: dict):
         return ingredients
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/presets")
+async def get_ingredient_presets():
+    return {"categories": INGREDIENT_PRESETS}
 
 @router.post("")
 async def add_ingredient(ingredient: IngredientCreate, user_id: str):

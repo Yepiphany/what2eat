@@ -87,11 +87,16 @@ export interface User {
 
 export interface RecipeRecommendationRequest {
   available_ingredients: string[];
+  preset_ingredients?: string[];
   taste_preferences?: TastePreference[];
   diet_type?: DietType;
   max_cooking_time?: number;
   max_difficulty?: RecipeDifficulty;
   cooking_level?: string;
+}
+
+export interface IngredientPresetResponse {
+  categories: Record<string, string[]>;
 }
 
 export interface VoiceCommand {

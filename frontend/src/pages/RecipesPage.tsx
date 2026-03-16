@@ -98,7 +98,7 @@ export default function RecipesPage() {
       setIsLoading(false);
       isFetchingRef.current = false;
     }
-  }, [availableIngredientNames, setRecommendations, addRecipePage, setCurrentPage, setRecipePages, getRecipePagesLength]);
+  }, [availableIngredientNames, preferences.tastePreferences, preferences.dietType, preferences.maxCookingTime, preferences.cookingLevel, setRecommendations, addRecipePage, setCurrentPage, setRecipePages, getRecipePagesLength]);
 
   // 加载数据库数据 - 只在组件挂载和食材变化时执行
   useEffect(() => {

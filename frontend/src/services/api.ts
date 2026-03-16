@@ -3,6 +3,7 @@ import axios from "axios";
 import type {
     CookingSession,
     Ingredient,
+    IngredientPresetResponse,
     Recipe,
     RecipeRecommendationRequest,
     User,
@@ -62,6 +63,11 @@ export const ingredientApi = {
 
     getIngredients: async (userId: string): Promise<Ingredient[]> => {
         const response = await api.get(`/ingredients/user/${userId}`);
+        return response.data;
+    },
+
+    getPresetIngredients: async (): Promise<IngredientPresetResponse> => {
+        const response = await api.get("/ingredients/presets");
         return response.data;
     },
 

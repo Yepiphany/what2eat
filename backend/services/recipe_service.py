@@ -131,6 +131,74 @@ def enhance_recipe_with_matching(recipe: Dict, available_ingredients: List[str])
     
     return recipe
 
+
+def enforce_unique_ingredient_usage(recipes: List[Dict], available_ingredients: List[str]) -> List[Dict]:
+    """
+    在一组推荐菜谱中限制“每种现有食材仅参与一个菜谱匹配”。
+    规则：某食材一旦被前面菜谱命中，后续菜谱不再将其计为 matched。
+    """
+    remaining_available = [i.lower().strip() for i in available_ingredients if i and i.strip()]
+    updated_recipes: List[Dict] = []
+
+    for recipe in recipes:
+        recipe_title = recipe.get("title", "")
+        recipe_ingredients = recipe.get("ingredients", [])
+
+        matched = []
+        missing = []
+
+        for ing in recipe_ingredients:
+            if _should_ignore_missing_ingredient(ing, recipe_title):
+                continue
+
+            ing_lower = str(ing).lower().strip()
+            matched_index = None
+
+            for idx, avail in enumerate(remaining_available):
+                if avail == ing_lower or avail in ing_lower or ing_lower in avail:
+                    matched_index = idx
+                    break
+
+            if matched_index is not None:
+                matched.append(ing)
+                # 消耗该食材，确保不会被后续菜谱再次匹配
+                remaining_available.pop(matched_index)
+            else:
+                missing.append(ing)
+
+        considered_count = len(matched) + len(missing)
+        match_percentage = (
+            round(len(matched) / considered_count * 100, 1)
+            if considered_count
+            else 100.0
+        )
+
+        updated = dict(recipe)
+        updated["matched_ingredients"] = matched
+        updated["missing_ingredients"] = missing
+        updated["match_percentage"] = match_percentage
+        updated_recipes.append(updated)
+
+    return updated_recipes
+
+
+def prioritize_recipes_by_match(recipes: List[Dict]) -> List[Dict]:
+    """
+    按“命中用户已有食材”的程度排序：
+    1) match_percentage 高的在前
+    2) matched_ingredients 多的在前
+    3) missing_ingredients 少的在前
+    """
+    return sorted(
+        recipes,
+        key=lambda recipe: (
+            float(recipe.get("match_percentage", 0) or 0),
+            len(recipe.get("matched_ingredients", []) or []),
+            -len(recipe.get("missing_ingredients", []) or []),
+        ),
+        reverse=True,
+    )
+
 def get_cached_recipes(ingredients_hash: str) -> Optional[List[Dict]]:
     """
     从缓存获取菜谱。
@@ -229,6 +297,7 @@ def get_recipe_from_database(recipe_id: str) -> Optional[Dict]:
 
 async def get_ai_batch_recipes(
     available_ingredients: List[str],
+    matching_ingredients: Optional[List[str]] = None,
     taste_preferences: Optional[List[TastePreference]] = None,
     diet_type: Optional[DietType] = None,
     count: int = 3,
@@ -238,6 +307,8 @@ async def get_ai_batch_recipes(
 ) -> List[Dict]:
     if not available_ingredients:
         return []
+
+    effective_matching_ingredients = matching_ingredients or available_ingredients
     
     ingredients_hash = generate_ingredients_hash(available_ingredients, taste_preferences, diet_type)
     
@@ -325,6 +396,7 @@ async def get_ai_batch_recipes(
 4. 根据用户的饮食偏好调整菜谱结构
 5. taste_tags 必须使用中文，可选值：辣、甜、酸、咸、鲜、清淡、苦
 6. missing_ingredients 中忽略常见调味品（如盐、糖、生抽、料酒、葱姜蒜等）和水；仅在缺少菜品特色调味品时提示（如豆瓣酱、咖喱、孜然、沙茶酱等）
+7. 5道菜整体设计时，现有食材要尽量分散使用：每种“现有食材”最多只在1道菜中作为可命中食材出现，避免同一现有食材在多道菜重复占用
 
 严格按照JSON数组格式返回：
 
@@ -374,7 +446,7 @@ async def get_ai_batch_recipes(
                 for recipe in recipes_data[:count]:
                     if recipe and "title" in recipe:
                         recipe["id"] = generate_recipe_id()
-                        recipe = enhance_recipe_with_matching(recipe, available_ingredients)
+                        recipe = enhance_recipe_with_matching(recipe, effective_matching_ingredients)
                         recipe["image_url"] = None
                         
                         category = recipe.get("category", "").lower()
@@ -473,6 +545,8 @@ async def get_ai_batch_recipes(
             print(f"JSON decode error: {e}, content: {content}")
         
         if all_recipes:
+            all_recipes = enforce_unique_ingredient_usage(all_recipes, effective_matching_ingredients)
+            all_recipes = prioritize_recipes_by_match(all_recipes)
             save_recipes_to_cache(ingredients_hash, available_ingredients, all_recipes, taste_preferences, diet_type)
         
         return all_recipes[:count]
