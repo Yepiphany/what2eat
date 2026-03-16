@@ -16,7 +16,7 @@ class DietType(str, Enum):
     BALANCED = "balanced"
     MEAT_LOVER = "meat_lover"
     VEGETABLE_LOVER = "vegetable_lover"
-    LOW_CARB = "low_carb"
+    FITNESS_MEAL = "fitness_meal"
 
 class CookingTime(str, Enum):
     QUICK = "quick"  # < 15 mins

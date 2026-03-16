@@ -25,7 +25,7 @@ COMMON_SEASONING_KEYWORDS = [
     "盐", "食盐", "糖", "白糖", "冰糖", "酱油", "生抽", "老抽", "料酒", "米酒", "黄酒",
     "醋", "陈醋", "白醋", "香醋", "蚝油", "鸡精", "味精", "胡椒", "白胡椒", "黑胡椒粉",
     "淀粉", "生粉", "玉米淀粉", "油", "食用油", "花生油", "菜籽油", "橄榄油", "香油",
-    "葱", "姜", "蒜", "葱花", "姜末", "蒜末", "十三香"
+    "葱", "姜", "蒜", "葱花", "姜末", "蒜末", "十三香", "水", "清水"
 ]
 
 # 这些调味品通常代表菜品风味特征，缺失时应提示。
@@ -260,7 +260,7 @@ async def get_ai_batch_recipes(
             "balanced": "均衡饮食（荤素搭配，营养均衡）",
             "meat_lover": "爱吃肉（偏好肉类菜品，多推荐荤菜）",
             "vegetable_lover": "爱吃菜（偏好蔬菜菜品，多推荐素菜）",
-            "low_carb": "低碳水（减少米饭、面条等主食，多用蔬菜和肉类）"
+            "fitness_meal": "健身餐（高蛋白、控油控盐、营养均衡）"
         }
         diet_str = diet_descriptions.get(diet_type.value if diet_type else "balanced", "均衡饮食")
         ingredients_str = ", ".join(available_ingredients)
@@ -287,11 +287,11 @@ async def get_ai_batch_recipes(
 - 1道荤菜（包含肉类/海鲜）
 - 3道素菜（纯蔬菜/豆制品，不能含肉类）
 - 1道素汤"""
-        elif diet_type and diet_type.value == "low_carb":
-            category_instruction = """请直接返回5道菜（四菜一汤），低碳水饮食：
-- 2道荤菜（必须包含肉类/海鲜，不使用淀粉勾芡）
-- 2道素菜（纯蔬菜，避免土豆、红薯等高碳水蔬菜）
-- 1道汤品（清汤为主，不加淀粉）"""
+        elif diet_type and diet_type.value == "fitness_meal":
+            category_instruction = """请直接返回5道菜（四菜一汤），健身餐饮食：
+- 2道荤菜（高蛋白、低油，优先鸡胸肉/牛肉/鱼虾，避免重油重糖）
+- 2道素菜（高纤维、少油少盐，避免过度勾芡）
+- 1道汤品（清汤为主，控制油脂和盐分）"""
         else:
             category_instruction = """请直接返回5道菜（四菜一汤），包含：
 - 2道荤菜（必须包含肉类/海鲜，如：猪肉、牛肉、鸡肉、鱼虾等，禁止用蛋类冒充荤菜）
@@ -447,7 +447,7 @@ async def get_ai_batch_recipes(
                             selected_soup.extend(extra_soup)
                     all_recipes = selected_meat + selected_veg + selected_soup
                 else:
-                    # 均衡饮食和低碳水: 2荤2素1汤
+                    # 均衡饮食和健身餐: 2荤2素1汤
                     selected_meat = meat_recipes[:2]
                     selected_veg = veg_recipes[:2]
                     selected_soup = soup_recipes[:1]
@@ -484,5 +484,5 @@ async def get_ai_batch_recipes(
 def generate_shopping_list(recipe_id: str, user_ingredients: List[str]) -> Dict:
     return {
         "shopping_list": [],
-        "tips": ["请查看菜谱详情获取购物清单"]
+        "tips": ["请查看菜谱详情获取采购清单"]
     }

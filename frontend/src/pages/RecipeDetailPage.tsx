@@ -13,9 +13,8 @@ import {
   Check,
   X
 } from 'lucide-react';
-import { recipeApi, cookingApi } from '../services/api';
+import { recipeApi } from '../services/api';
 import { getUserId } from '../utils/userId';
-import { useCookingStore } from '../stores';
 import type { Recipe } from '../types';
 import { incrementViewedRecipes } from './ProfilePage';
 
@@ -65,7 +64,8 @@ const dietLabels: Record<string, string> = {
   balanced: '均衡饮食',
   meat_lover: '爱吃肉',
   vegetable_lover: '爱吃菜',
-  low_carb: '低碳水',
+  fitness_meal: '健身餐',
+  low_carb: '健身餐',
   vegetarian: '爱吃菜',
   normal: '均衡饮食',
 };
@@ -80,8 +80,6 @@ export default function RecipeDetailPage() {
   const [isAdding, setIsAdding] = useState(false);
   const hasViewedRef = useRef(false);
   
-  const { setSession } = useCookingStore();
-
   useEffect(() => {
     if (id && !hasViewedRef.current) {
       hasViewedRef.current = true;
@@ -118,19 +116,14 @@ export default function RecipeDetailPage() {
     }
   };
 
-  const startCooking = async () => {
+  const startCooking = () => {
     if (!recipe) {
       navigate('/profile');
       return;
     }
 
-    try {
-      const session = await cookingApi.startSession(recipe.id, getUserId());
-      setSession(session);
-      navigate(`/cooking/${recipe.id}`);
-    } catch (error) {
-      console.error('Failed to start cooking session:', error);
-    }
+    // 立即跳转，避免等待网络请求导致按钮响应慢
+    navigate(`/cooking/${recipe.id}`);
   };
 
   const toggleFavorite = () => {

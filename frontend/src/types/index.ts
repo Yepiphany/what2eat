@@ -48,7 +48,7 @@ export interface Recipe {
 
 export type RecipeDifficulty = 'easy' | 'medium' | 'hard';
 export type TastePreference = 'spicy' | 'sweet' | 'sour' | 'salty' | 'umami' | 'mild' | 'bitter';
-export type DietType = 'balanced' | 'meat_lover' | 'vegetable_lover' | 'low_carb';
+export type DietType = 'balanced' | 'meat_lover' | 'vegetable_lover' | 'fitness_meal';
 
 export interface CookingStep {
   step_number: number;
