@@ -3,6 +3,7 @@ from typing import List, Optional, Dict, Any
 from models.database import get_supabase_client
 from pydantic import BaseModel
 from datetime import datetime
+import uuid
 
 router = APIRouter()
 
@@ -32,7 +33,7 @@ class ShoppingItem(BaseModel):
     completed: bool = False
 
 class ShoppingListCreate(BaseModel):
-    recipe_id: str
+    recipe_id: Optional[str] = None
     items: List[str]
     recipe_title: Optional[str] = None
 
@@ -46,9 +47,44 @@ async def create_shopping_list(request: ShoppingListCreate, user_id: str):
         
         items_with_status = [{"name": item, "completed": False} for item in request.items]
         
+        recipe_id = request.recipe_id
+        if recipe_id is not None and recipe_id.strip() == "":
+            recipe_id = None
+
+        if recipe_id is None and request.recipe_title:
+            try:
+                existing_recipe = (
+                    supabase.table("recipes")
+                    .select("id")
+                    .eq("title", request.recipe_title)
+                    .limit(1)
+                    .execute()
+                )
+                if existing_recipe.data:
+                    recipe_id = existing_recipe.data[0].get("id")
+                else:
+                    new_recipe_id = str(uuid.uuid4())
+                    supabase.table("recipes").insert({
+                        "id": new_recipe_id,
+                        "title": request.recipe_title,
+                        "description": "语音助手添加的采购清单菜品",
+                        "ingredients": request.items,
+                        "steps": ["按常规做法烹饪"],
+                        "cooking_time": 20,
+                        "difficulty": "easy",
+                        "taste_tags": [],
+                        "diet_types": [],
+                        "servings": 2,
+                        "user_id": None,
+                    }).execute()
+                    recipe_id = new_recipe_id
+            except Exception as recipe_error:
+                print(f"[WARN] Failed to upsert placeholder recipe for shopping list: {recipe_error}")
+                recipe_id = None
+
         data = {
             "user_id": user_id,
-            "recipe_id": request.recipe_id,
+            "recipe_id": recipe_id,
             "items": items_with_status,
             "status": "pending"
         }
