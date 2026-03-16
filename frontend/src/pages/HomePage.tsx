@@ -14,6 +14,7 @@ import {
     Carrot,
     X,
 } from "lucide-react";
+import headTitleImage from "../assets/head.png";
 
 import { useIngredientsStore, useRecipesStore } from "../stores";
 import { ingredientApi } from "../services/api";
@@ -76,6 +77,7 @@ export default function HomePage() {
         recommend: "根据当前食材智能匹配可做菜谱，减少决策成本。",
         inventory: "查看现有食材与保质提醒，及时补充和清理库存。",
         shopping: "汇总缺失食材，快速生成待采购清单。",
+        continueCook: "快速返回烹饪流程，继续上次的做菜进度。",
         stats: "追踪今日库存、推荐与采购数量变化。",
         profile: "管理口味偏好与使用习惯，让推荐更贴合你。",
     };
@@ -85,15 +87,17 @@ export default function HomePage() {
         recommend: { to: "/cook/recommendations", label: "查看推荐" },
         inventory: { to: "/food", label: "查看库存" },
         shopping: { to: "/food/shopping", label: "前往采购" },
+        continueCook: { to: "/cook", label: "继续烹饪" },
         stats: { to: "/profile#today-stats", label: "查看统计" },
         profile: { to: "/profile", label: "个性化设置" },
     };
 
     const cardActionStyles: Record<string, string> = {
         scan: "bg-primary-400 hover:bg-primary-500",
-        recommend: "bg-accent-400 hover:bg-accent-500",
-        inventory: "bg-orange-400 hover:bg-orange-500",
+        recommend: "bg-red-500 hover:bg-red-600",
+        inventory: "bg-yellow-400 hover:bg-yellow-500",
         shopping: "bg-orange-400 hover:bg-orange-500",
+        continueCook: "bg-purple-400 hover:bg-purple-500",
         stats: "bg-blue-400 hover:bg-blue-500",
         profile: "bg-gray-400 hover:bg-gray-500",
     };
@@ -125,13 +129,14 @@ export default function HomePage() {
     };
 
     return (
-        <div className="relative h-[calc(100dvh-var(--layout-top-space)-var(--layout-nav-space))] w-full overflow-hidden animate-fade-in flex flex-col items-center bg-transparent">
-            <div className="relative w-[100%] h-full pt-4 pb-1">
-                <div className="relative z-20 mb-3 flex items-center justify-center gap-2">
-                    <Utensils size={20} className="text-primary-600" />
-                    <h1 className="text-3xl font-extrabold tracking-wide text-gray-800">
-                        今天吃什么
-                    </h1>
+        <div className="relative h-[calc(100dvh-var(--layout-top-space)-var(--layout-nav-space))] w-full overflow-y-auto overflow-x-hidden animate-fade-in flex flex-col items-center bg-transparent">
+            <div className="relative w-[100%] h-[calc(100%+120px)] pt-2 pb-4">
+                <div className="relative z-20 -mt-16 mb-1 flex items-center justify-center">
+                    <img
+                        src={headTitleImage}
+                        alt="今天吃什么"
+                        className="block h-[20rem] w-auto object-contain"
+                    />
                 </div>
                 {[
                     {
@@ -167,8 +172,8 @@ export default function HomePage() {
                     {
                         id: "inventory",
                         title: "食材库存",
-                        icon: <Carrot size={24} className="text-orange-600" />,
-                        bgBorder: "border-orange-200/60",
+                        icon: <Carrot size={24} className="text-yellow-500" />,
+                        bgBorder: "border-yellow-200/70",
                         content: (
                             <div className="flex flex-col h-full justify-center px-2 space-y-3 relative z-10 pointer-events-auto">
                                 <div className="flex items-center justify-between">
@@ -232,10 +237,8 @@ export default function HomePage() {
                     {
                         id: "recommend",
                         title: "推荐菜谱",
-                        icon: (
-                            <Utensils size={24} className="text-accent-600" />
-                        ),
-                        bgBorder: "border-accent-200/60",
+                        icon: <Utensils size={24} className="text-red-600" />,
+                        bgBorder: "border-red-200/70",
                         content: (
                             <div className="flex items-center space-x-3 h-full px-2">
                                 <div className="flex-1 min-w-0">
@@ -245,7 +248,7 @@ export default function HomePage() {
                                 </div>
                                 <Link
                                     to="/cook/recommendations"
-                                    className="px-5 py-3 bg-accent-100/80 text-accent-700 hover:bg-accent-200 rounded-xl font-medium text-sm transition-colors shadow-sm"
+                                    className="px-5 py-3 bg-red-100 text-red-700 hover:bg-red-200 rounded-xl font-medium text-sm transition-colors shadow-sm"
                                 >
                                     浏览菜谱
                                 </Link>
@@ -300,6 +303,19 @@ export default function HomePage() {
                                         所有采购已完成
                                     </div>
                                 )}
+                            </div>
+                        ),
+                    },
+                    {
+                        id: "continueCook",
+                        title: "继续烹饪",
+                        icon: <ChefHat size={24} className="text-purple-600" />,
+                        bgBorder: "border-purple-200/60",
+                        content: (
+                            <div className="flex items-center h-full px-2">
+                                <p className="text-sm text-gray-500">
+                                    返回烹饪页面，继续你的当前菜谱流程。
+                                </p>
                             </div>
                         ),
                     },
@@ -390,8 +406,8 @@ export default function HomePage() {
                     // --- STACKING MATH LOGIC ---
                     const CARD_HEIGHT = 180;
                     const VISIBLE_HEIGHT = CARD_HEIGHT * 0.4; // overlap 60%
-                    // Reserve space for the page title while keeping the stack near bottom nav.
-                    const STACK_BASE_OFFSET = 96;
+                    // Align first card top edge with title image bottom edge.
+                    const STACK_BASE_OFFSET = -100;
 
                     // 当前激活卡片视为堆叠中的第 0 层，其余卡片顺延
                     const stackIndex = isActive
