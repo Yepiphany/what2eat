@@ -246,13 +246,14 @@ export default function VoiceAssistant() {
     const { preferences } = useUserStore();
 
     const [isOpen, setIsOpen] = useState(false);
+    const [isLauncherExpanded, setIsLauncherExpanded] = useState(false);
     const [isListening, setIsListening] = useState(false);
     const [input, setInput] = useState("");
     const [messages, setMessages] = useState<Message[]>([
         {
             id: "welcome",
             role: "assistant",
-            text: "你好，我是语音助手。你可以说“我买了一斤猪肉、三颗白菜”或“我想吃鱼香肉丝，需要哪些食材”。",
+            text: "你好，我是你的烹饪助手栗子，也可以叫我小栗！想吃什么都可以和我说！",
         },
     ]);
     const [actionButton, setActionButton] = useState<ActionButton | null>(null);
@@ -260,6 +261,7 @@ export default function VoiceAssistant() {
 
     const recognitionRef = useRef<any>(null);
     const messagesRef = useRef<HTMLDivElement>(null);
+    const openPanelTimerRef = useRef<number | null>(null);
 
     const supportSpeech = useMemo(
         () =>
@@ -279,7 +281,21 @@ export default function VoiceAssistant() {
     }, [messages, isOpen]);
 
     useEffect(() => {
+        return () => {
+            if (openPanelTimerRef.current !== null) {
+                window.clearTimeout(openPanelTimerRef.current);
+                openPanelTimerRef.current = null;
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        if (openPanelTimerRef.current !== null) {
+            window.clearTimeout(openPanelTimerRef.current);
+            openPanelTimerRef.current = null;
+        }
         setIsOpen(false);
+        setIsLauncherExpanded(false);
         setActionButton(null);
         setAwaitingRecommendation(false);
         if (isListening) {
@@ -471,6 +487,35 @@ export default function VoiceAssistant() {
         setIsListening(false);
     };
 
+    const closeAssistantPanel = () => {
+        if (openPanelTimerRef.current !== null) {
+            window.clearTimeout(openPanelTimerRef.current);
+            openPanelTimerRef.current = null;
+        }
+        setIsOpen(false);
+        setIsLauncherExpanded(false);
+        stopListening();
+    };
+
+    const handleLauncherClick = () => {
+        if (!isLauncherExpanded) {
+            setIsLauncherExpanded(true);
+            if (supportSpeech) {
+                startListening();
+            }
+            return;
+        }
+
+        setIsLauncherExpanded(false);
+        if (openPanelTimerRef.current !== null) {
+            window.clearTimeout(openPanelTimerRef.current);
+        }
+        openPanelTimerRef.current = window.setTimeout(() => {
+            setIsOpen(true);
+            openPanelTimerRef.current = null;
+        }, 180);
+    };
+
     const submitText = async () => {
         await handleCommand(input);
         setInput("");
@@ -480,16 +525,37 @@ export default function VoiceAssistant() {
         <>
             {!isOpen && (
                 <button
-                    onClick={() => setIsOpen(true)}
-                    className="fixed bottom-24 right-4 md:bottom-8 md:right-8 z-50 h-14 w-14 rounded-full bg-primary-500 text-white shadow-xl hover:bg-primary-600 flex items-center justify-center"
-                    aria-label="语音助手"
+                    onClick={handleLauncherClick}
+                    className={`fixed bottom-24 right-4 md:bottom-8 md:right-8 z-50 h-14 rounded-full bg-primary-500 text-white shadow-xl hover:bg-primary-600 overflow-hidden transform-gpu transition-all duration-300 ease-out ${
+                        isLauncherExpanded
+                            ? "w-[240px] max-w-[82vw] px-4 flex items-center justify-between"
+                            : "w-14 flex items-center justify-center"
+                    }`}
+                    aria-label={isLauncherExpanded ? "语音助手正在听" : "语音助手"}
                 >
-                    <Mic size={24} />
+                    {isLauncherExpanded ? (
+                        <>
+                            <div className="flex items-center gap-2 min-w-0">
+                                <Mic
+                                    size={20}
+                                    className="transition-all duration-300 animate-pulse"
+                                />
+                                <span className="text-sm font-medium">
+                                    {supportSpeech ? "正在听..." : "语音不可用"}
+                                </span>
+                            </div>
+                            <span className="text-xs text-white/90 whitespace-nowrap transition-opacity duration-200 opacity-100">
+                                点按查看对话
+                            </span>
+                        </>
+                    ) : (
+                        <Mic size={24} className="block" />
+                    )}
                 </button>
             )}
 
             {isOpen && (
-                <div className="fixed bottom-24 right-4 md:bottom-8 md:right-8 z-50 w-[92vw] max-w-sm h-[60vh] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden">
+                <div className="fixed bottom-24 right-4 md:bottom-8 md:right-8 z-50 w-[92vw] max-w-sm h-[60vh] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden animate-slide-up">
                     <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-gray-50">
                         <div className="flex items-center space-x-2">
                             <Mic size={18} className="text-primary-600" />
@@ -498,7 +564,7 @@ export default function VoiceAssistant() {
                             </span>
                         </div>
                         <button
-                            onClick={() => setIsOpen(false)}
+                            onClick={closeAssistantPanel}
                             className="text-gray-500 hover:text-gray-700"
                         >
                             <X size={18} />
@@ -570,8 +636,13 @@ export default function VoiceAssistant() {
                                 onKeyDown={(e) =>
                                     e.key === "Enter" && submitText()
                                 }
-                                placeholder="输入你的需求..."
-                                className="flex-1 h-10 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                disabled={isListening}
+                                placeholder={
+                                    isListening
+                                        ? "正在听..."
+                                        : "输入你的需求..."
+                                }
+                                className="flex-1 h-10 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                             />
 
                             <button
