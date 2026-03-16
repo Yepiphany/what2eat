@@ -1,12 +1,12 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, Scan, Utensils, User, ShoppingCart } from "lucide-react";
+import { Home, Scan, User, Boxes, ChefHat } from "lucide-react";
 import VoiceAssistant from "./VoiceAssistant";
 
 const navItems = [
-    { path: "/", icon: Home, label: "首页" },
-    { path: "/scanner", icon: Scan, label: "扫描" },
-    { path: "/recipes", icon: Utensils, label: "菜谱" },
-    { path: "/shopping", icon: ShoppingCart, label: "采购" },
+    { path: "/home", icon: Home, label: "首页" },
+    { path: "/food", icon: Boxes, label: "食材" },
+    { path: "/scan", icon: Scan, label: "扫描" },
+    { path: "/cook", icon: ChefHat, label: "烹饪" },
     { path: "/profile", icon: User, label: "我的" },
 ];
 
@@ -15,18 +15,44 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
     const getActiveView = () => {
         const path = location.pathname;
-        if (path === "/") return "home";
-        if (path === "/scanner") return "scanner";
-        if (path.startsWith("/recipes") && !path.includes("/cooking"))
-            return "recipes";
-        if (path.startsWith("/cooking")) return "cooking";
-        if (path === "/shopping") return "shopping";
+        if (path === "/" || path.startsWith("/home")) return "home";
+        if (path.startsWith("/food") || path.startsWith("/shopping"))
+            return "food";
+        if (path.startsWith("/scan") || path.startsWith("/scanner"))
+            return "scan";
+        if (
+            path.startsWith("/cook") ||
+            path.startsWith("/recipes") ||
+            path.startsWith("/cooking")
+        )
+            return "cook";
         if (path === "/profile") return "profile";
         return "home";
     };
 
     const currentView = getActiveView();
-    const isCookingMode = currentView === "cooking";
+    const isCookingMode =
+        location.pathname.startsWith("/cook/session") ||
+        location.pathname.startsWith("/cooking/");
+
+    const isNavItemActive = (path: string) => {
+        if (path === "/home") {
+            return currentView === "home";
+        }
+        if (path === "/food") {
+            return currentView === "food";
+        }
+        if (path === "/scan") {
+            return currentView === "scan";
+        }
+        if (path === "/cook") {
+            return currentView === "cook";
+        }
+        if (path === "/profile") {
+            return currentView === "profile";
+        }
+        return false;
+    };
 
     if (isCookingMode) {
         return <>{children}</>;
@@ -34,54 +60,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
-            <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md shadow-sm">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between items-center h-16">
-                        <Link to="/" className="flex items-center space-x-2">
-                            <span className="text-2xl">🍳</span>
-                            <span className="text-xl font-bold text-primary-600">
-                                今天吃什么
-                            </span>
-                        </Link>
-
-                        <nav className="hidden md:flex space-x-8">
-                            {navItems.map((item) => {
-                                const Icon = item.icon;
-                                const isActive =
-                                    location.pathname === item.path;
-                                return (
-                                    <Link
-                                        key={item.path}
-                                        to={item.path}
-                                        className={`flex items-center space-x-1 px-3 py-2 rounded-lg transition-all duration-200 ${
-                                            isActive
-                                                ? "text-primary-600 bg-primary-50"
-                                                : "text-gray-600 hover:text-primary-600 hover:bg-gray-50"
-                                        }`}
-                                    >
-                                        <Icon size={20} />
-                                        <span className="font-medium">
-                                            {item.label}
-                                        </span>
-                                    </Link>
-                                );
-                            })}
-                        </nav>
-                    </div>
-                </div>
-            </header>
+            <VoiceAssistant />
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24">
                 {children}
             </main>
 
-            <VoiceAssistant />
-
             <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 md:hidden">
                 <div className="flex justify-around py-2">
                     {navItems.map((item) => {
                         const Icon = item.icon;
-                        const isActive = location.pathname === item.path;
+                        const isActive = isNavItemActive(item.path);
                         return (
                             <Link
                                 key={item.path}

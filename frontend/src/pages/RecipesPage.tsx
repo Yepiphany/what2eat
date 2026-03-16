@@ -4,6 +4,11 @@ import { Clock, X, RefreshCw, Trash2 } from 'lucide-react';
 import { useIngredientsStore, useRecipesStore, useUserStore } from '../stores';
 import { recipeApi } from '../services/api';
 import type { Recipe, DietType, TastePreference } from '../types';
+import {
+  clearRecipeCacheDirty,
+  consumeRecipeForceRefreshRequest,
+  isRecipeCacheDirty,
+} from '../services/recipeCache';
 
 const difficultyOptions = [
   { value: 'easy', label: '简单', color: 'bg-green-100 text-green-700 border-green-200' },
@@ -87,6 +92,7 @@ export default function RecipesPage() {
           console.log('[DEBUG] 已有页面，跳过设置新菜谱');
         }
       }
+      clearRecipeCacheDirty();
       // 菜谱加载完成后，设置 isFirstTimeLoading 为 false
       setIsFirstTimeLoading(false);
     } catch (error) {
@@ -103,9 +109,9 @@ export default function RecipesPage() {
   // 加载数据库数据 - 只在组件挂载和食材变化时执行
   useEffect(() => {
     // 清除标志
-    const shouldForceRefresh = sessionStorage.getItem('forceRefreshRecipes') === 'true';
+    const shouldForceRefresh =
+      consumeRecipeForceRefreshRequest() || isRecipeCacheDirty();
     if (shouldForceRefresh) {
-      sessionStorage.removeItem('forceRefreshRecipes');
       console.log('[DEBUG] 检测到强制刷新标志，执行 forceRefresh');
       
       const loadData = async () => {
@@ -234,6 +240,7 @@ export default function RecipesPage() {
       setCurrentPage(0);
       setRecommendations([]);
       setRecipePages([]);
+      clearRecipeCacheDirty();
       // 重置加载标志，允许重新加载
       hasLoadedRef.current = false;
       setIsFirstTimeLoading(false); // 设置为false，显示暂无菜谱界面而不是加载动画
@@ -247,17 +254,6 @@ export default function RecipesPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <header className="text-center">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-800">🍳 智能菜谱推荐</h1>
-        <p className="text-gray-500 mt-1 md:mt-2 text-sm md:text-base">
-          {availableIngredientNames.length > 0 ? (
-            <>基于 {availableIngredientNames.length} 种食材，为您推荐四菜一汤</>
-          ) : (
-            <>添加食材后获取个性化推荐</>
-          )}
-        </p>
-      </header>
-
       {isLoading || isLoadingFromDb || (isFirstTimeLoading && availableIngredientNames.length > 0) ? (
         <div className="flex justify-center py-8 md:py-12">
           <div className="text-center">
@@ -277,7 +273,7 @@ export default function RecipesPage() {
           <p className="text-xs md:text-base text-gray-500 mb-4 md:mb-6 max-w-md mx-auto px-4">
             添加食材到库存后，AI 将根据您的食材推荐四菜一汤
           </p>
-          <Link to="/scanner" className="btn-primary text-sm md:text-base">
+          <Link to="/scan" className="btn-primary text-sm md:text-base">
             扫描添加食材
           </Link>
         </div>
@@ -461,7 +457,7 @@ export default function RecipesPage() {
 function RecipeCard({ recipe, getDifficultyColor }: { recipe: Recipe; getDifficultyColor: (difficulty: string) => string }) {
   return (
     <Link
-      to={`/recipes/${recipe.id}`}
+      to={`/cook/recommendations/${recipe.id}`}
       className="card hover:shadow-xl transition-all duration-300 group"
     >
       <div className="h-20 bg-gradient-to-br from-primary-400 to-primary-600 p-4 flex items-center justify-between">

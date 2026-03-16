@@ -16,7 +16,7 @@ import {
 import { recipeApi } from '../services/api';
 import { getUserId } from '../utils/userId';
 import type { Recipe } from '../types';
-import { incrementViewedRecipes } from './ProfilePage';
+import { incrementViewedRecipes } from '../services/statistics';
 
 const difficultyLabels = {
   easy: { text: '简单', color: 'bg-green-100 text-green-700' },
@@ -123,7 +123,7 @@ export default function RecipeDetailPage() {
     }
 
     // 立即跳转，避免等待网络请求导致按钮响应慢
-    navigate(`/cooking/${recipe.id}`);
+    navigate(`/cook/session/${recipe.id}`);
   };
 
   const toggleFavorite = () => {
@@ -164,7 +164,7 @@ export default function RecipeDetailPage() {
     return (
       <div className="text-center py-20">
         <h2 className="text-2xl font-bold text-gray-800 mb-4">菜谱不存在</h2>
-        <Link to="/recipes" className="btn-primary">
+        <Link to="/cook/recommendations" className="btn-primary">
           返回菜谱列表
         </Link>
       </div>
@@ -385,7 +385,7 @@ export default function RecipeDetailPage() {
 
               {recipe.missing_ingredients && recipe.missing_ingredients.length > 0 && (
                 <button
-                  onClick={() => navigate('/shopping')}
+                  onClick={() => navigate('/food/shopping')}
                   className="w-full btn-secondary py-3 flex items-center justify-center space-x-2"
                 >
                   <ShoppingCart size={20} />

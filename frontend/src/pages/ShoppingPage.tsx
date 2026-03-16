@@ -1,113 +1,47 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ChevronLeft, ShoppingCart, Trash2, Check, Plus } from "lucide-react";
-import { recipeApi } from "../services/api";
-import { getUserId } from "../utils/userId";
-
-interface ShoppingListItem {
-    id: string;
-    recipe_id: string | null;
-    recipe_title: string;
-    items: (string | { name: string; completed: boolean })[];
-    status: string;
-    created_at: string;
-}
-
-function isItemObject(
-    item: string | { name: string; completed: boolean },
-): item is { name: string; completed: boolean } {
-    return typeof item === "object" && item !== null && "name" in item;
-}
-
-function getItemName(
-    item: string | { name: string; completed: boolean },
-): string {
-    if (isItemObject(item)) {
-        return item.name;
-    }
-    return item;
-}
-
-function isItemCompleted(
-    item: string | { name: string; completed: boolean },
-): boolean {
-    if (isItemObject(item)) {
-        return item.completed;
-    }
-    return false;
-}
+import {
+    getItemName,
+    isItemCompleted,
+    type ShoppingListItem,
+    useShoppingLists,
+} from "../hooks/useShoppingLists";
 
 export default function ShoppingPage() {
     const navigate = useNavigate();
-    const [shoppingLists, setShoppingLists] = useState<ShoppingListItem[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<"pending" | "completed">(
         "pending",
     );
     const [showCompleteDialog, setShowCompleteDialog] = useState(false);
     const [pendingCompleteItem, setPendingCompleteItem] =
         useState<ShoppingListItem | null>(null);
-    const [pendingCount, setPendingCount] = useState(0);
-    const [completedCount, setCompletedCount] = useState(0);
     const [showClearDialog, setShowClearDialog] = useState(false);
     const [isClearing, setIsClearing] = useState(false);
-
-    useEffect(() => {
-        loadShoppingLists();
-        loadCounts();
-    }, [activeTab]);
-
-    const loadCounts = async () => {
-        try {
-            const currentUserId = getUserId();
-            const [pending, completed] = await Promise.all([
-                recipeApi.getShoppingLists(currentUserId, "pending"),
-                recipeApi.getShoppingLists(currentUserId, "completed"),
-            ]);
-            setPendingCount(pending.length);
-            setCompletedCount(completed.length);
-        } catch (error) {
-            console.error("Failed to load counts:", error);
-        }
-    };
-
-    const loadShoppingLists = async () => {
-        setIsLoading(true);
-        try {
-            const currentUserId = getUserId();
-            const lists = await recipeApi.getShoppingLists(
-                currentUserId,
-                activeTab,
-            );
-            setShoppingLists(lists);
-        } catch (error) {
-            console.error("Failed to load shopping lists:", error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    const {
+        shoppingLists,
+        isLoading,
+        pendingCount,
+        completedCount,
+        toggleItem,
+        completeShoppingList,
+        deleteShoppingListItem,
+        clearAllShoppingLists,
+    } = useShoppingLists(activeTab);
 
     const handleToggleItem = async (
         itemId: string,
         itemIndex: number,
-        onComplete?: (items: any[]) => void,
+        onComplete?: (
+            items: (string | { name: string; completed: boolean })[],
+        ) => void,
     ) => {
         try {
-            const currentUserId = getUserId();
-            const response = await recipeApi.toggleShoppingListItem(
-                currentUserId,
-                itemId,
-                itemIndex,
-            );
-            await loadShoppingLists();
-            loadCounts();
+            const response = await toggleItem(itemId, itemIndex);
             if (onComplete && response.items) {
-                const allCompleted = response.items.every((ing: any) => {
-                    if (typeof ing === "object" && ing !== null) {
-                        return ing.completed === true;
-                    }
-                    return false;
-                });
+                const allCompleted = response.items.every((ing) =>
+                    isItemCompleted(ing),
+                );
                 if (allCompleted) {
                     onComplete(response.items);
                 }
@@ -136,12 +70,7 @@ export default function ShoppingPage() {
     const confirmMoveToCompleted = async () => {
         if (pendingCompleteItem) {
             try {
-                await recipeApi.completeShoppingList(
-                    getUserId(),
-                    pendingCompleteItem.id,
-                );
-                loadShoppingLists();
-                loadCounts();
+                await completeShoppingList(pendingCompleteItem.id);
             } catch (error) {
                 console.error("Failed to complete shopping list:", error);
             }
@@ -154,9 +83,7 @@ export default function ShoppingPage() {
         if (!confirm("确定删除此项目？")) return;
 
         try {
-            await recipeApi.deleteShoppingListItem(getUserId(), itemId);
-            loadShoppingLists();
-            loadCounts();
+            await deleteShoppingListItem(itemId);
         } catch (error) {
             console.error("Failed to delete item:", error);
         }
@@ -167,10 +94,7 @@ export default function ShoppingPage() {
         setIsClearing(true);
 
         try {
-            await recipeApi.clearShoppingList(getUserId());
-            setShoppingLists([]);
-            setPendingCount(0);
-            setCompletedCount(0);
+            await clearAllShoppingLists();
         } catch (error) {
             console.error("Failed to clear shopping list:", error);
             alert("清空失败，请重试");
@@ -189,18 +113,15 @@ export default function ShoppingPage() {
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <header className="text-center relative">
+            <div>
                 <button
                     onClick={() => navigate(-1)}
-                    className="absolute left-0 flex items-center space-x-2 text-gray-600 hover:text-gray-800"
+                    className="inline-flex items-center space-x-2 text-gray-600 hover:text-gray-800"
                 >
                     <ChevronLeft size={24} />
                     <span>返回</span>
                 </button>
-                <h1 className="text-3xl font-bold text-gray-800">
-                    🛒 采购清单
-                </h1>
-            </header>
+            </div>
 
             <div className="flex space-x-2">
                 <button
@@ -237,7 +158,7 @@ export default function ShoppingPage() {
                             : "已全部完成"}
                     </p>
                     <Link
-                        to="/recipes"
+                        to="/cook/recommendations"
                         className="inline-flex items-center space-x-2 px-6 py-3 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
                     >
                         <Plus size={20} />
@@ -269,7 +190,7 @@ export default function ShoppingPage() {
                                         <div>
                                             {item.recipe_id ? (
                                                 <Link
-                                                    to={`/recipes/${item.recipe_id}`}
+                                                    to={`/cook/recommendations/${item.recipe_id}`}
                                                     className="font-medium text-gray-800 hover:text-primary-600"
                                                 >
                                                     {item.recipe_title ||

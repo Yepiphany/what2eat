@@ -1,7 +1,15 @@
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  useLocation,
+  Navigate,
+} from 'react-router-dom';
 import { useEffect } from 'react';
 import HomePage from './pages/HomePage';
+import FoodPage from './pages/FoodPage';
 import ScannerPage from './pages/ScannerPage';
+import CookHubPage from './pages/CookHubPage';
 import RecipesPage from './pages/RecipesPage';
 import RecipeDetailPage from './pages/RecipeDetailPage';
 import CookingPage from './pages/CookingPage';
@@ -23,13 +31,31 @@ function App() {
       <ScrollToTop />
       <Layout>
         <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/scanner" element={<ScannerPage />} />
-          <Route path="/recipes" element={<RecipesPage />} />
-          <Route path="/recipes/:id" element={<RecipeDetailPage />} />
-          <Route path="/cooking/:recipeId" element={<CookingPage />} />
+          <Route path="/" element={<Navigate to="/home" replace />} />
+          <Route path="/home" element={<HomePage />} />
+
+          <Route path="/food" element={<Navigate to="/food/inventory" replace />} />
+          <Route path="/food/inventory" element={<FoodPage />} />
+          <Route path="/food/shopping" element={<ShoppingPage />} />
+
+          <Route path="/scan" element={<ScannerPage />} />
+
+          <Route path="/cook" element={<CookHubPage />} />
+          <Route path="/cook/recommendations" element={<RecipesPage />} />
+          <Route
+            path="/cook/recommendations/:id"
+            element={<RecipeDetailPage />}
+          />
+          <Route path="/cook/session/:recipeId" element={<CookingPage />} />
+
           <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/shopping" element={<ShoppingPage />} />
+
+          {/* Legacy path redirects for compatibility while migrating links */}
+          <Route path="/scanner" element={<Navigate to="/scan" replace />} />
+          <Route path="/recipes" element={<Navigate to="/cook/recommendations" replace />} />
+          <Route path="/recipes/:id" element={<RecipeDetailPage />} />
+          <Route path="/shopping" element={<Navigate to="/food/shopping" replace />} />
+          <Route path="/cooking/:recipeId" element={<CookingPage />} />
         </Routes>
       </Layout>
     </Router>

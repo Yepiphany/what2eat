@@ -14,9 +14,19 @@ import {
     Trash2,
 } from "lucide-react";
 import { useIngredientsStore, useRecipesStore } from "../stores";
-import { ingredientApi, recipeApi } from "../services/api";
+import { ingredientApi } from "../services/api";
 import type { Ingredient } from "../types";
 import { getUserId } from "../utils/userId";
+import {
+    getItemName,
+    isItemCompleted,
+    useShoppingLists,
+} from "../hooks/useShoppingLists";
+import {
+    clearRecipeCacheDirty,
+    markRecipeCacheDirty,
+    requestRecipeForceRefresh,
+} from "../services/recipeCache";
 
 export default function HomePage() {
     const navigate = useNavigate();
@@ -36,51 +46,24 @@ export default function HomePage() {
         category: "other",
     });
     const [isAdding, setIsAdding] = useState(false);
-    const [shoppingLists, setShoppingLists] = useState<any[]>([]);
     const [showRecipeRefreshDialog, setShowRecipeRefreshDialog] =
         useState(false);
     const [showClearConfirmDialog, setShowClearConfirmDialog] = useState(false);
+    const { shoppingLists } = useShoppingLists("pending");
 
     const expiringSoon = ingredients.filter((ing) => ing.is_expiring_soon);
     const hasIngredients = ingredients.length > 0;
 
     useEffect(() => {
-        loadShoppingLists();
         // 如果 recipePages 为空，从数据库加载
         if (recipePages.length === 0) {
             loadFromDatabase();
         }
     }, []);
 
-    const loadShoppingLists = async () => {
-        try {
-            const lists = await recipeApi.getShoppingLists(
-                getUserId(),
-                "pending",
-            );
-            setShoppingLists(lists);
-        } catch (error) {
-            console.error("Failed to load shopping lists:", error);
-        }
-    };
-
-    const getItemName = (item: any): string => {
-        if (typeof item === "object" && item !== null) {
-            return item.name || "";
-        }
-        return item || "";
-    };
-
-    const getItemCompleted = (item: any): boolean => {
-        if (typeof item === "object" && item !== null) {
-            return item.completed === true;
-        }
-        return false;
-    };
-
     const pendingPurchaseCount = shoppingLists.reduce((count, list) => {
         const pendingItems = list.items.filter(
-            (item: any) => !getItemCompleted(item),
+            (item: any) => !isItemCompleted(item),
         );
         return count + pendingItems.length;
     }, 0);
@@ -95,6 +78,7 @@ export default function HomePage() {
                 getUserId(),
             );
             addIngredient(saved);
+            markRecipeCacheDirty();
             setNewIngredient({
                 name: "",
                 quantity: 1,
@@ -117,6 +101,7 @@ export default function HomePage() {
         try {
             await ingredientApi.deleteIngredient(ingredientId, getUserId());
             removeIngredient(ingredientId);
+            markRecipeCacheDirty();
             setShowRecipeRefreshDialog(true);
         } catch (err) {
             console.error("Failed to delete ingredient:", err);
@@ -125,22 +110,9 @@ export default function HomePage() {
 
     return (
         <div className="space-y-8 animate-fade-in">
-            <section className="text-center py-6 md:py-8">
-                <h1 className="text-2xl md:text-4xl font-bold text-gray-800 mb-2 md:mb-3">
-                    今天吃什么 🍽️
-                </h1>
-                <p className="text-gray-600 text-sm md:text-lg max-w-2xl mx-auto px-4">
-                    告别选择困难症，让AI帮你决定今天的美味！
-                    <br />
-                    <span className="text-primary-600 font-medium">
-                        扫一扫冰箱，美味即刻呈现
-                    </span>
-                </p>
-            </section>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Link
-                    to="/scanner"
+                    to="/scan"
                     className="card p-6 md:p-8 group border-2 border-transparent hover:border-primary-500 min-h-[140px] md:min-h-[160px] flex items-center"
                 >
                     <div className="flex items-center space-x-4 md:space-x-6 w-full">
@@ -177,7 +149,7 @@ export default function HomePage() {
 
                 <div className="flex flex-col gap-6">
                     <Link
-                        to="/recipes"
+                        to="/cook/recommendations"
                         className="card p-4 md:p-6 group border-2 border-transparent hover:border-accent-500"
                     >
                         <div className="flex items-center space-x-3 md:space-x-4">
@@ -433,7 +405,7 @@ export default function HomePage() {
 
                     <section className="mt-8">
                         <Link
-                            to="/shopping"
+                            to="/food/shopping"
                             className="flex items-center justify-between group"
                         >
                             <h2 className="text-lg md:text-xl font-semibold text-gray-800 group-hover:text-primary-600 transition-colors">
@@ -458,7 +430,7 @@ export default function HomePage() {
                                             />
                                             {list.recipe_id ? (
                                                 <Link
-                                                    to={`/recipes/${list.recipe_id}`}
+                                                    to={`/cook/recommendations/${list.recipe_id}`}
                                                     className="font-medium text-gray-800 hover:text-primary-600"
                                                 >
                                                     {list.recipe_title ||
@@ -477,25 +449,19 @@ export default function HomePage() {
                                                     <span
                                                         key={idx}
                                                         className={`inline-flex items-center space-x-1 text-sm px-2 py-1 rounded-full ${
-                                                            getItemCompleted(
-                                                                item,
-                                                            )
+                                                            isItemCompleted(item)
                                                                 ? "bg-green-100 text-gray-400 line-through"
                                                                 : "bg-orange-100 text-gray-700"
                                                         }`}
                                                     >
                                                         <div
                                                             className={`w-3 h-3 rounded-full border flex items-center justify-center ${
-                                                                getItemCompleted(
-                                                                    item,
-                                                                )
+                                                                isItemCompleted(item)
                                                                     ? "bg-green-500 border-green-500"
                                                                     : "border-orange-300"
                                                             }`}
                                                         >
-                                                            {getItemCompleted(
-                                                                item,
-                                                            ) && (
+                                                            {isItemCompleted(item) && (
                                                                 <Check
                                                                     size={8}
                                                                     className="text-white"
@@ -533,10 +499,10 @@ export default function HomePage() {
                         扫描你的冰箱或食材，系统将智能识别并推荐最适合的菜谱
                     </p>
                     <div className="flex justify-center space-x-4">
-                        <Link to="/scanner" className="btn-primary">
+                        <Link to="/scan" className="btn-primary">
                             立即扫描
                         </Link>
-                        <Link to="/recipes" className="btn-secondary">
+                        <Link to="/cook/recommendations" className="btn-secondary">
                             浏览菜谱
                         </Link>
                     </div>
@@ -629,11 +595,8 @@ export default function HomePage() {
                             <button
                                 onClick={() => {
                                     setShowRecipeRefreshDialog(false);
-                                    sessionStorage.setItem(
-                                        "forceRefreshRecipes",
-                                        "true",
-                                    );
-                                    navigate("/recipes");
+                                    requestRecipeForceRefresh();
+                                    navigate("/cook/recommendations");
                                 }}
                                 className="flex-1 px-6 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors"
                             >
@@ -670,6 +633,7 @@ export default function HomePage() {
                                     setShowClearConfirmDialog(false);
                                     clearIngredients();
                                     clearRecommendations();
+                                    clearRecipeCacheDirty();
                                 }}
                                 className="flex-1 px-6 py-3 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-colors"
                             >

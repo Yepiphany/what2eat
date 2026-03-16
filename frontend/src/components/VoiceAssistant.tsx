@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Mic, MicOff, Send, X } from "lucide-react";
+import { Mic, MicOff, X } from "lucide-react";
 import { ingredientApi, recipeApi } from "../services/api";
 import { useIngredientsStore, useRecipesStore, useUserStore } from "../stores";
 import { getUserId } from "../utils/userId";
+import {
+    clearRecipeCacheDirty,
+    markRecipeCacheDirty,
+} from "../services/recipeCache";
 import type {
     Ingredient,
     IngredientCategory,
@@ -266,23 +270,22 @@ export default function VoiceAssistant() {
     const { setRecommendations } = useRecipesStore();
     const { preferences } = useUserStore();
 
-    const [isOpen, setIsOpen] = useState(false);
-    const [isLauncherExpanded, setIsLauncherExpanded] = useState(false);
+    const [isPanelOpen, setIsPanelOpen] = useState(false);
     const [isListening, setIsListening] = useState(false);
     const [input, setInput] = useState("");
     const [messages, setMessages] = useState<Message[]>([
         {
             id: "welcome",
             role: "assistant",
-            text: "你好，我是你的烹饪助手栗子，也可以叫我小栗！想吃什么都可以和我说！",
+            text: "你好，我是你的烹饪助手。可以直接说：我买了2个番茄，或帮我推荐菜谱。",
         },
     ]);
     const [actionButton, setActionButton] = useState<ActionButton | null>(null);
     const [awaitingRecommendation, setAwaitingRecommendation] = useState(false);
 
     const recognitionRef = useRef<any>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
     const messagesRef = useRef<HTMLDivElement>(null);
-    const openPanelTimerRef = useRef<number | null>(null);
 
     const supportSpeech = useMemo(
         () =>
@@ -295,28 +298,7 @@ export default function VoiceAssistant() {
     );
 
     useEffect(() => {
-        messagesRef.current?.scrollTo({
-            top: messagesRef.current.scrollHeight,
-            behavior: "smooth",
-        });
-    }, [messages, isOpen]);
-
-    useEffect(() => {
-        return () => {
-            if (openPanelTimerRef.current !== null) {
-                window.clearTimeout(openPanelTimerRef.current);
-                openPanelTimerRef.current = null;
-            }
-        };
-    }, []);
-
-    useEffect(() => {
-        if (openPanelTimerRef.current !== null) {
-            window.clearTimeout(openPanelTimerRef.current);
-            openPanelTimerRef.current = null;
-        }
-        setIsOpen(false);
-        setIsLauncherExpanded(false);
+        setIsPanelOpen(false);
         setActionButton(null);
         setAwaitingRecommendation(false);
         if (isListening) {
@@ -324,6 +306,29 @@ export default function VoiceAssistant() {
             setIsListening(false);
         }
     }, [location.pathname]);
+
+    useEffect(() => {
+        if (!isPanelOpen) return;
+        messagesRef.current?.scrollTo({
+            top: messagesRef.current.scrollHeight,
+            behavior: "smooth",
+        });
+    }, [messages, isPanelOpen]);
+
+    useEffect(() => {
+        if (!isPanelOpen) return;
+
+        const onPointerDown = (event: MouseEvent) => {
+            if (!containerRef.current) return;
+            const target = event.target as Node;
+            if (!containerRef.current.contains(target)) {
+                setIsPanelOpen(false);
+            }
+        };
+
+        window.addEventListener("mousedown", onPointerDown);
+        return () => window.removeEventListener("mousedown", onPointerDown);
+    }, [isPanelOpen]);
 
     const appendMessage = (role: "user" | "assistant", text: string) => {
         setMessages((prev) => [
@@ -370,6 +375,7 @@ export default function VoiceAssistant() {
             }
 
             setRecommendations(recipes);
+            clearRecipeCacheDirty();
             const titles = recipes
                 .slice(0, 3)
                 .map((r) => `《${r.title}》`)
@@ -378,7 +384,7 @@ export default function VoiceAssistant() {
             appendMessage("assistant", msg);
             speak(msg);
             if (shouldNavigate) {
-                navigate("/recipes");
+                navigate("/cook/recommendations");
             }
         } catch (error) {
             console.error("Failed to recommend recipes:", error);
@@ -400,8 +406,8 @@ export default function VoiceAssistant() {
 
         if (awaitingRecommendation && yesIntent) {
             setAwaitingRecommendation(false);
-            setIsOpen(false);
-            navigate("/recipes");
+            setIsPanelOpen(false);
+            navigate("/cook/recommendations");
             await recommendRecipes(false);
             return;
         }
@@ -419,6 +425,7 @@ export default function VoiceAssistant() {
                 await ingredientApi.addIngredientsBatch(items, getUserId());
                 const latest = await ingredientApi.getIngredients(getUserId());
                 setIngredients(latest);
+                markRecipeCacheDirty();
 
                 const itemText = items
                     .map((item) => `${item.name}${item.quantity}${item.unit}`)
@@ -482,6 +489,7 @@ export default function VoiceAssistant() {
 
     const startListening = () => {
         if (!supportSpeech) return;
+        setIsPanelOpen(true);
         const Recognition =
             (window as any).SpeechRecognition ||
             (window as any).webkitSpeechRecognition;
@@ -508,176 +516,142 @@ export default function VoiceAssistant() {
         setIsListening(false);
     };
 
-    const closeAssistantPanel = () => {
-        if (openPanelTimerRef.current !== null) {
-            window.clearTimeout(openPanelTimerRef.current);
-            openPanelTimerRef.current = null;
-        }
-        setIsOpen(false);
-        setIsLauncherExpanded(false);
-        stopListening();
-    };
-
-    const handleLauncherClick = () => {
-        if (!isLauncherExpanded) {
-            setIsLauncherExpanded(true);
-            if (supportSpeech) {
-                startListening();
-            }
-            return;
-        }
-
-        setIsLauncherExpanded(false);
-        if (openPanelTimerRef.current !== null) {
-            window.clearTimeout(openPanelTimerRef.current);
-        }
-        openPanelTimerRef.current = window.setTimeout(() => {
-            setIsOpen(true);
-            openPanelTimerRef.current = null;
-        }, 180);
-    };
-
     const submitText = async () => {
-        const textToSubmit = input;
+        const textToSubmit = input.trim();
+        if (!textToSubmit) return;
         setInput("");
         await handleCommand(textToSubmit);
     };
 
     return (
-        <>
-            {!isOpen && (
-                <button
-                    onClick={handleLauncherClick}
-                    className={`fixed bottom-24 right-4 md:bottom-8 md:right-8 z-50 h-14 rounded-full bg-primary-500 text-white shadow-xl hover:bg-primary-600 overflow-hidden transform-gpu transition-all duration-300 ease-out ${
-                        isLauncherExpanded
-                            ? "w-[240px] max-w-[82vw] px-4 flex items-center justify-between"
-                            : "w-14 flex items-center justify-center"
-                    }`}
-                    aria-label={isLauncherExpanded ? "语音助手正在听" : "语音助手"}
-                >
-                    {isLauncherExpanded ? (
-                        <>
-                            <div className="flex items-center gap-2 min-w-0">
-                                <Mic
-                                    size={20}
-                                    className="transition-all duration-300 animate-pulse"
-                                />
-                                <span className="text-sm font-medium">
-                                    {supportSpeech ? "正在听..." : "语音不可用"}
+        <div
+            ref={containerRef}
+            className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-gray-100"
+        >
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 relative">
+                <div className="rounded-2xl border border-gray-200 bg-white shadow-sm px-2 py-2 flex items-center gap-2">
+                    <button
+                        onClick={isListening ? stopListening : startListening}
+                        disabled={!supportSpeech}
+                        className={`h-10 w-10 rounded-full flex items-center justify-center transition-colors ${
+                            isListening
+                                ? "bg-red-500 text-white"
+                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        } disabled:opacity-50`}
+                        aria-label={isListening ? "停止语音输入" : "开始语音输入"}
+                    >
+                        {isListening ? <MicOff size={18} /> : <Mic size={18} />}
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setIsPanelOpen(true)}
+                        className="flex-1 h-10 px-3 border border-gray-200 rounded-xl text-sm text-left text-gray-500 hover:bg-gray-50"
+                    >
+                        {isListening
+                            ? "正在语音识别..."
+                            : "点击进入悬浮聊天，支持语音与文字"}
+                    </button>
+                </div>
+
+                {!supportSpeech && (
+                    <p className="mt-1 text-xs text-orange-600">
+                        当前浏览器不支持语音识别，可继续使用文字输入。
+                    </p>
+                )}
+
+                {isPanelOpen && (
+                    <div className="absolute top-full right-0 mt-2 w-full md:max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden z-50 animate-slide-up">
+                        <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-gray-50">
+                            <div className="flex items-center space-x-2">
+                                <Mic size={18} className="text-primary-600" />
+                                <span className="font-semibold text-gray-800">
+                                    语音助手
                                 </span>
                             </div>
-                            <span className="text-xs text-white/90 whitespace-nowrap transition-opacity duration-200 opacity-100">
-                                点按查看对话
-                            </span>
-                        </>
-                    ) : (
-                        <Mic size={24} className="block" />
-                    )}
-                </button>
-            )}
-
-            {isOpen && (
-                <div className="fixed bottom-24 right-4 md:bottom-8 md:right-8 z-50 w-[92vw] max-w-sm h-[60vh] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden animate-slide-up">
-                    <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-gray-50">
-                        <div className="flex items-center space-x-2">
-                            <Mic size={18} className="text-primary-600" />
-                            <span className="font-semibold text-gray-800">
-                                语音助手
-                            </span>
+                            <button
+                                onClick={() => setIsPanelOpen(false)}
+                                className="text-gray-500 hover:text-gray-700"
+                                aria-label="关闭聊天面板"
+                            >
+                                <X size={18} />
+                            </button>
                         </div>
-                        <button
-                            onClick={closeAssistantPanel}
-                            className="text-gray-500 hover:text-gray-700"
+
+                        <div
+                            ref={messagesRef}
+                            className="h-72 overflow-y-auto p-3 space-y-3 bg-white"
                         >
-                            <X size={18} />
-                        </button>
-                    </div>
+                            {messages.map((msg) => (
+                                <div
+                                    key={msg.id}
+                                    className={`w-fit max-w-[85%] px-3 py-2 rounded-xl text-sm leading-relaxed whitespace-pre-wrap break-words ${
+                                        msg.role === "assistant"
+                                            ? "bg-gray-100 text-gray-700"
+                                            : "ml-auto bg-primary-500 text-white"
+                                    }`}
+                                >
+                                    {msg.text}
+                                </div>
+                            ))}
 
-                    <div
-                        ref={messagesRef}
-                        className="flex-1 overflow-y-auto p-3 space-y-3 bg-white"
-                    >
-                        {messages.map((msg) => (
-                            <div
-                                key={msg.id}
-                                className={`w-fit max-w-[85%] px-3 py-2 rounded-xl text-sm leading-relaxed whitespace-pre-wrap break-words ${
-                                    msg.role === "assistant"
-                                        ? "bg-gray-100 text-gray-700"
-                                        : "ml-auto bg-primary-500 text-white"
-                                }`}
-                            >
-                                {msg.text}
+                            {actionButton?.action === "recommend_now" && (
+                                <button
+                                    onClick={() => {
+                                        setAwaitingRecommendation(false);
+                                        setActionButton(null);
+                                        setIsPanelOpen(false);
+                                        navigate("/cook/recommendations");
+                                        void recommendRecipes(false);
+                                    }}
+                                    className="px-3 py-2 text-sm rounded-lg bg-primary-50 text-primary-700 hover:bg-primary-100"
+                                >
+                                    {actionButton.label}
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="p-3 border-t border-gray-100 bg-white">
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={
+                                        isListening
+                                            ? stopListening
+                                            : startListening
+                                    }
+                                    disabled={!supportSpeech}
+                                    className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                                        isListening
+                                            ? "bg-red-500 text-white"
+                                            : "bg-gray-100 text-gray-700"
+                                    } disabled:opacity-50`}
+                                >
+                                    {isListening ? (
+                                        <MicOff size={18} />
+                                    ) : (
+                                        <Mic size={18} />
+                                    )}
+                                </button>
+
+                                <input
+                                    value={input}
+                                    onChange={(e) => setInput(e.target.value)}
+                                    onKeyDown={(e) =>
+                                        e.key === "Enter" && submitText()
+                                    }
+                                    disabled={isListening}
+                                    placeholder={
+                                        isListening
+                                            ? "正在听..."
+                                            : "输入后按 Enter 发送"
+                                    }
+                                    className="flex-1 h-10 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                                />
                             </div>
-                        ))}
-
-                        {actionButton?.action === "recommend_now" && (
-                            <button
-                                onClick={() => {
-                                    setAwaitingRecommendation(false);
-                                    setActionButton(null);
-                                    setIsOpen(false);
-                                    navigate("/recipes");
-                                    void recommendRecipes(false);
-                                }}
-                                className="px-3 py-2 text-sm rounded-lg bg-primary-50 text-primary-700 hover:bg-primary-100"
-                            >
-                                {actionButton.label}
-                            </button>
-                        )}
-                    </div>
-
-                    {!supportSpeech && (
-                        <div className="px-3 py-2 text-xs text-orange-600 bg-orange-50 border-t border-orange-100">
-                            当前浏览器不支持语音识别，可使用文字输入。
-                        </div>
-                    )}
-
-                    <div className="p-3 border-t border-gray-100 bg-white">
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={
-                                    isListening ? stopListening : startListening
-                                }
-                                disabled={!supportSpeech}
-                                className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                                    isListening
-                                        ? "bg-red-500 text-white"
-                                        : "bg-gray-100 text-gray-700"
-                                } disabled:opacity-50`}
-                            >
-                                {isListening ? (
-                                    <MicOff size={18} />
-                                ) : (
-                                    <Mic size={18} />
-                                )}
-                            </button>
-
-                            <input
-                                value={input}
-                                onChange={(e) => setInput(e.target.value)}
-                                onKeyDown={(e) =>
-                                    e.key === "Enter" && submitText()
-                                }
-                                disabled={isListening}
-                                placeholder={
-                                    isListening
-                                        ? "正在听..."
-                                        : "输入你的需求..."
-                                }
-                                className="flex-1 h-10 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
-                            />
-
-                            <button
-                                onClick={submitText}
-                                disabled={!input.trim()}
-                                className="h-10 w-10 rounded-lg bg-primary-500 text-white flex items-center justify-center disabled:opacity-40"
-                            >
-                                <Send size={16} />
-                            </button>
                         </div>
                     </div>
-                </div>
-            )}
-        </>
+                )}
+            </div>
+        </div>
     );
 }

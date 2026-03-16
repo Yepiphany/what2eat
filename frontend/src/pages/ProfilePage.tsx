@@ -14,6 +14,10 @@ import { useUserStore, useIngredientsStore } from "../stores";
 import { userApi } from "../services/api";
 import { getUserId } from "../utils/userId";
 import type { TastePreference, DietType } from "../types";
+import {
+    getScannedIngredientsCount,
+    getViewedRecipesCount,
+} from "../services/statistics";
 
 const tasteOptions: {
     value: TastePreference;
@@ -84,23 +88,6 @@ const dietOptions: { value: DietType; label: string; description: string }[] = [
     },
 ];
 
-const STORAGE_KEY_SCANNED = "stats_scanned_ingredients";
-const STORAGE_KEY_VIEWED = "stats_viewed_recipes";
-
-export const incrementScannedIngredients = (count: number = 1) => {
-    const current = localStorage.getItem(STORAGE_KEY_SCANNED);
-    const newValue = (current ? parseInt(current, 10) : 0) + count;
-    localStorage.setItem(STORAGE_KEY_SCANNED, newValue.toString());
-    return newValue;
-};
-
-export const incrementViewedRecipes = (count: number = 1) => {
-    const current = localStorage.getItem(STORAGE_KEY_VIEWED);
-    const newValue = (current ? parseInt(current, 10) : 0) + count;
-    localStorage.setItem(STORAGE_KEY_VIEWED, newValue.toString());
-    return newValue;
-};
-
 export default function ProfilePage() {
     const [isEditing, setIsEditing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -131,10 +118,8 @@ export default function ProfilePage() {
             setSelectedLevel(currentUser.cooking_level || null);
         }
 
-        const scanned = localStorage.getItem(STORAGE_KEY_SCANNED);
-        const viewed = localStorage.getItem(STORAGE_KEY_VIEWED);
-        setScannedIngredientsCount(scanned ? parseInt(scanned, 10) : 0);
-        setViewedRecipesCount(viewed ? parseInt(viewed, 10) : 0);
+        setScannedIngredientsCount(getScannedIngredientsCount());
+        setViewedRecipesCount(getViewedRecipesCount());
     }, [currentUser]);
 
     const handleSave = async () => {
@@ -268,10 +253,6 @@ export default function ProfilePage() {
 
     return (
         <div className="animate-fade-in">
-            <header className="mb-6">
-                <h1 className="text-3xl font-bold text-gray-800">我的</h1>
-            </header>
-
             {/* merged sections: personal, stats, settings */}
 
             <div className="space-y-6">
