@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Mic, MicOff, X } from "lucide-react";
+import { Mic, MicOff, Send, X } from "lucide-react";
 import { ingredientApi, recipeApi } from "../services/api";
 import { useIngredientsStore, useRecipesStore, useUserStore } from "../stores";
 import { getUserId } from "../utils/userId";
@@ -275,9 +275,19 @@ export default function VoiceAssistant() {
     const [input, setInput] = useState("");
     const [messages, setMessages] = useState<Message[]>([
         {
-            id: "welcome",
+            id: "welcome-1",
             role: "assistant",
-            text: "你好，我是你的烹饪助手。可以直接说：我买了2个番茄，或帮我推荐菜谱。",
+            text: "你好，我是你的烹饪助手栗子，也可以叫我小栗！想吃什么都可以和我说！",
+        },
+        {
+            id: "welcome-2",
+            role: "assistant",
+            text: "你可以说：今天买了一棵白菜，三个西红柿，一斤猪肉，一斤鸡蛋！",
+        },
+        {
+            id: "welcome-3",
+            role: "assistant",
+            text: "也可以说：今天我想吃茄子！",
         },
     ]);
     const [actionButton, setActionButton] = useState<ActionButton | null>(null);
@@ -529,28 +539,27 @@ export default function VoiceAssistant() {
             className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-gray-100"
         >
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 relative">
-                <div className="rounded-2xl border border-gray-200 bg-white shadow-sm px-2 py-2 flex items-center gap-2">
-                    <button
-                        onClick={isListening ? stopListening : startListening}
-                        disabled={!supportSpeech}
-                        className={`h-10 w-10 rounded-full flex items-center justify-center transition-colors ${
-                            isListening
-                                ? "bg-red-500 text-white"
-                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                        } disabled:opacity-50`}
-                        aria-label={isListening ? "停止语音输入" : "开始语音输入"}
-                    >
-                        {isListening ? <MicOff size={18} /> : <Mic size={18} />}
-                    </button>
-
+                <div className="relative">
                     <button
                         type="button"
                         onClick={() => setIsPanelOpen(true)}
-                        className="flex-1 h-10 px-3 border border-gray-200 rounded-xl text-sm text-left text-gray-500 hover:bg-gray-50"
+                        className="w-full h-12 pl-4 pr-14 border border-gray-200 rounded-full text-sm text-left text-gray-500 hover:bg-gray-50 bg-white shadow-sm flex items-center overflow-hidden"
                     >
                         {isListening
                             ? "正在语音识别..."
                             : "点击进入悬浮聊天，支持语音与文字"}
+                    </button>
+                    <button
+                        onClick={isListening ? stopListening : startListening}
+                        disabled={!supportSpeech}
+                        className={`absolute right-1 top-1 h-10 w-10 rounded-full flex items-center justify-center transition-colors shadow-sm ${
+                            isListening
+                                ? "bg-red-500 text-white"
+                                : "bg-primary-500 text-white hover:bg-primary-600"
+                        } disabled:opacity-50`}
+                        aria-label={isListening ? "停止语音输入" : "开始语音输入"}
+                    >
+                        {isListening ? <MicOff size={18} /> : <Mic size={18} />}
                     </button>
                 </div>
 
@@ -566,7 +575,7 @@ export default function VoiceAssistant() {
                             <div className="flex items-center space-x-2">
                                 <Mic size={18} className="text-primary-600" />
                                 <span className="font-semibold text-gray-800">
-                                    语音助手
+                                    栗子
                                 </span>
                             </div>
                             <button
@@ -643,10 +652,18 @@ export default function VoiceAssistant() {
                                     placeholder={
                                         isListening
                                             ? "正在听..."
-                                            : "输入后按 Enter 发送"
+                                            : "输入你的需求..."
                                     }
                                     className="flex-1 h-10 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                                 />
+
+                                <button
+                                    onClick={submitText}
+                                    disabled={!input.trim()}
+                                    className="h-10 w-10 rounded-lg bg-primary-500 text-white flex items-center justify-center disabled:opacity-40"
+                                >
+                                    <Send size={16} />
+                                </button>
                             </div>
                         </div>
                     </div>
