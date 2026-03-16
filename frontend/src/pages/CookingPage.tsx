@@ -127,7 +127,7 @@ export default function CookingPage() {
     setIsLoading(true);
     try {
       let activeSession: CookingSession;
-      if (currentSession && currentSession.recipe_id === recipeId) {
+      if (currentSession && String(currentSession.recipe_id) === String(recipeId)) {
         activeSession = currentSession;
         setSession(currentSession);
         setElapsedTime(calculateElapsedTime(currentSession));

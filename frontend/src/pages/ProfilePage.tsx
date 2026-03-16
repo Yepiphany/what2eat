@@ -29,7 +29,7 @@ const dietOptions: { value: DietType; label: string; description: string }[] = [
   { value: 'balanced', label: '均衡饮食', description: '荤素搭配，营养均衡' },
   { value: 'meat_lover', label: '爱吃肉', description: '偏好肉类菜品，无肉不欢' },
   { value: 'vegetable_lover', label: '爱吃菜', description: '偏好蔬菜菜品，清淡健康' },
-  { value: 'low_carb', label: '低碳水', description: '减少碳水摄入，控制热量' },
+  { value: 'fitness_meal', label: '健身餐', description: '高蛋白、控油控盐，助力训练恢复' },
 ];
 
 const STORAGE_KEY_SCANNED = 'stats_scanned_ingredients';
