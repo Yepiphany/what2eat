@@ -52,95 +52,116 @@ export function isItemCompleted(
 }
 
 export function useShoppingLists(activeStatus: ShoppingTabStatus = 'pending') {
-  const [shoppingLists, setShoppingLists] = useState<ShoppingListItem[]>([]);
+  const [allLists, setAllLists] = useState<ShoppingListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [pendingCount, setPendingCount] = useState(0);
-  const [completedCount, setCompletedCount] = useState(0);
 
-  const loadCounts = useCallback(async () => {
-    try {
-      const currentUserId = getUserId();
-      const [pending, completed] = await Promise.all([
-        recipeApi.getShoppingLists(currentUserId, 'pending'),
-        recipeApi.getShoppingLists(currentUserId, 'completed'),
-      ]);
-      setPendingCount(pending.length);
-      setCompletedCount(completed.length);
-    } catch (error) {
-      console.error('Failed to load shopping counts:', error);
+  // 派生状态，减少不必要的状态同步
+  const pendingLists = allLists.filter((list) => list.status === 'pending');
+  const completedLists = allLists.filter((list) => list.status === 'completed');
+  
+  const shoppingLists = activeStatus === 'pending' ? pendingLists : completedLists;
+  const pendingCount = pendingLists.length;
+  const completedCount = completedLists.length;
+
+  const loadAllLists = useCallback(async () => {
+    // 只有在没数据时才显示全局加载，否则静默刷新
+    if (allLists.length === 0) {
+      setIsLoading(true);
     }
-  }, []);
-
-  const loadShoppingLists = useCallback(
-      async (status: ShoppingTabStatus = activeStatus) => {
-        setIsLoading(true);
-        try {
-          const lists = (await recipeApi.getShoppingLists(
-                            getUserId(),
-                            status,
-                            )) as ShoppingListItem[];
-          setShoppingLists(lists);
-        } catch (error) {
-          console.error('Failed to load shopping lists:', error);
-        } finally {
-          setIsLoading(false);
-        }
-      },
-      [activeStatus],
-  );
+    try {
+      const lists = await recipeApi.getShoppingLists(getUserId()) as ShoppingListItem[];
+      setAllLists(lists || []);
+    } catch (error) {
+      console.error('Failed to load shopping lists:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [allLists.length]); // 依赖中加入 length
 
   useEffect(() => {
-    void Promise.all([loadShoppingLists(activeStatus), loadCounts()]);
-  }, [activeStatus, loadShoppingLists, loadCounts]);
+    void loadAllLists();
+  }, [loadAllLists]);
 
   const toggleItem = useCallback(
       async (itemId: string, itemIndex: number) => {
-        const response = await recipeApi.toggleShoppingListItem(
-            getUserId(),
-            itemId,
-            itemIndex,
+        // 先触发乐观更新
+        setAllLists((prevLists) => 
+          prevLists.map((list) => {
+            if (list.id === itemId) {
+              const newItems = [...list.items];
+              const itemToUpdate = newItems[itemIndex];
+              if (isItemObject(itemToUpdate)) {
+                newItems[itemIndex] = { ...itemToUpdate, completed: !itemToUpdate.completed };
+              } else {
+                newItems[itemIndex] = { name: itemToUpdate, completed: true };
+              }
+              return { ...list, items: newItems };
+            }
+            return list;
+          })
         );
-        await Promise.all([loadShoppingLists(activeStatus), loadCounts()]);
-        return response as {
-          items?:
-              (string |
-               {
-                 name: string;
-                 completed: boolean
-               })[]
-        };
+        
+        try {
+          const response = await recipeApi.toggleShoppingListItem(getUserId(), itemId, itemIndex);
+          return response as {
+            items?: (string | { name: string; completed: boolean })[]
+          };
+        } catch (error) {
+          // 如果失败，回退状态
+          console.error('Toggle failed, reloading', error);
+          await loadAllLists();
+          throw error;
+        }
       },
-      [activeStatus, loadShoppingLists, loadCounts],
+      [loadAllLists],
   );
 
   const completeShoppingList = useCallback(
       async (itemId: string) => {
-        await recipeApi.completeShoppingList(getUserId(), itemId);
-        await Promise.all([loadShoppingLists(activeStatus), loadCounts()]);
+        // 乐观更新
+        setAllLists(prev => prev.map(list => 
+          list.id === itemId ? { ...list, status: 'completed' } : list
+        ));
+        
+        try {
+          await recipeApi.completeShoppingList(getUserId(), itemId);
+        } catch (error) {
+          await loadAllLists();
+          throw error;
+        }
       },
-      [activeStatus, loadShoppingLists, loadCounts],
+      [loadAllLists]
   );
+
 
   const deleteShoppingListItem = useCallback(
       async (itemId: string) => {
-        await recipeApi.deleteShoppingListItem(getUserId(), itemId);
-        await Promise.all([loadShoppingLists(activeStatus), loadCounts()]);
+        // 乐观更新
+        setAllLists(prev => prev.filter(list => list.id !== itemId));
+        try {
+          await recipeApi.deleteShoppingListItem(getUserId(), itemId);
+        } catch (error) {
+          await loadAllLists();
+          throw error;
+        }
       },
-      [activeStatus, loadShoppingLists, loadCounts],
+      [loadAllLists],
   );
 
   const clearAllShoppingLists = useCallback(async () => {
+    // 这里清除所有的？我们可能是只清除 activeStatus 对应的那些？ 
+    // 不对，假设是全部清除或只清除特定的
     await recipeApi.clearShoppingList(getUserId());
-    await Promise.all([loadShoppingLists(activeStatus), loadCounts()]);
-  }, [activeStatus, loadShoppingLists, loadCounts]);
+    await loadAllLists();
+  }, [loadAllLists]);
 
   return {
     shoppingLists,
     isLoading,
     pendingCount,
     completedCount,
-    loadShoppingLists,
-    loadCounts,
+    loadShoppingLists: loadAllLists,
+    loadCounts: loadAllLists,
     toggleItem,
     completeShoppingList,
     deleteShoppingListItem,

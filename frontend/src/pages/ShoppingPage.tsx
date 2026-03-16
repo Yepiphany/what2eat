@@ -103,14 +103,6 @@ export default function ShoppingPage() {
         }
     };
 
-    if (isLoading) {
-        return (
-            <div className="flex justify-center py-20">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500" />
-            </div>
-        );
-    }
-
     return (
         <div className="space-y-6 animate-fade-in">
             <div>
@@ -146,7 +138,11 @@ export default function ShoppingPage() {
                 </button>
             </div>
 
-            {shoppingLists.length === 0 ? (
+            {isLoading && shoppingLists.length === 0 ? (
+                <div className="flex justify-center py-20">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500" />
+                </div>
+            ) : shoppingLists.length === 0 ? (
                 <div className="card p-12 text-center">
                     <ShoppingCart
                         size={64}
