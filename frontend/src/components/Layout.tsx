@@ -1,10 +1,10 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, Scan, User, Boxes, ChefHat } from "lucide-react";
+import { Home, Scan, User, Carrot, ChefHat } from "lucide-react";
 import VoiceAssistant from "./VoiceAssistant";
 
 const navItems = [
     { path: "/home", icon: Home, label: "首页" },
-    { path: "/food", icon: Boxes, label: "食材" },
+    { path: "/food", icon: Carrot, label: "食材" },
     { path: "/scan", icon: Scan, label: "扫描" },
     { path: "/cook", icon: ChefHat, label: "烹饪" },
     { path: "/profile", icon: User, label: "我的" },

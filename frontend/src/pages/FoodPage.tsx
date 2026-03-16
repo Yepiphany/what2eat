@@ -1,6 +1,6 @@
 import {useEffect, useMemo, useState} from 'react';
 import {Link, useNavigate} from 'react-router-dom';
-import {AlertTriangle, Boxes, Check, Plus, ScanLine, ShoppingCart, Trash2, X} from 'lucide-react';
+import {AlertTriangle, Carrot, Check, Plus, ScanLine, ShoppingCart, Trash2, X} from 'lucide-react';
 
 import {ingredientApi} from '../services/api';
 import {useIngredientsStore, useRecipesStore} from '../stores';
@@ -146,25 +146,26 @@ export default function FoodPage() {
       </section>
 
       <section className="card p-5 md:p-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 space-y-3 md:space-y-0">
+        <div className="flex flex-row items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-            <Boxes size={20} className="text-primary-600"/>
-            全部食材 ({ingredients.length} 种)
+            <Carrot size={20} className="text-primary-600"/>
+            <span className="hidden sm:inline">全部食材 ({ingredients.length} 种)</span>
+            <span className="sm:hidden">全部 ({ingredients.length})</span>
           </h2>
           <div className="flex items-center space-x-2">
             <button
                 onClick={() => setShowClearConfirmDialog(true)}
                 disabled={ingredients.length === 0}
-                className="flex items-center space-x-1 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center space-x-1 px-2 py-1.5 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Trash2 size={16}/>
+              <Trash2 size={14}/>
               <span>清空</span>
             </button>
             <button
                 onClick={() => setShowAddForm(true)}
-                className="flex items-center space-x-1 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
+                className="flex items-center space-x-1 px-2.5 py-1.5 text-sm bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
             >
-              <Plus size={18}/>
+              <Plus size={16}/>
               <span>手动添加</span>
             </button>
           </div>
@@ -268,7 +269,7 @@ export default function FoodPage() {
 
         {ingredients.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
-              <Boxes size={48} className="mx-auto mb-4 opacity-50"/>
+              <Carrot size={48} className="mx-auto mb-4 opacity-50"/>
               <p>暂无食材</p>
               <p className="text-sm mt-2">请先前往扫描页添加食材</p>
             </div>
