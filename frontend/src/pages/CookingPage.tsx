@@ -70,7 +70,7 @@ export default function CookingPage() {
   }, [isListening, isVoiceEnabled]);
 
   useEffect(() => {
-    if (isTimerRunning && session?.steps[session.current_step]?.duration_seconds) {
+    if (isTimerRunning) {
       timerRef.current = setInterval(() => {
         setElapsedTime(prev => prev + 1);
       }, 1000);
@@ -79,13 +79,13 @@ export default function CookingPage() {
         clearInterval(timerRef.current);
       }
     }
-    
+
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
     };
-  }, [isTimerRunning, session]);
+  }, [isTimerRunning]);
 
   useEffect(() => {
     if (isStepTimerActive && stepTimer !== null && stepTimer > 0) {
@@ -140,8 +140,16 @@ export default function CookingPage() {
       
       // 初始化当前步骤计时器
       const currentStepData = activeSession.steps[activeSession.current_step];
+      const shouldAutoRun = activeSession.status !== 'paused' && activeSession.status !== 'completed';
+
+      setIsTimerRunning(shouldAutoRun);
+
       if (currentStepData?.duration_seconds) {
         setStepTimer(currentStepData.duration_seconds);
+        setIsStepTimerActive(shouldAutoRun);
+      } else {
+        setStepTimer(null);
+        setIsStepTimerActive(false);
       }
     } catch (error) {
       console.error('Failed to fetch session:', error);
@@ -334,7 +342,16 @@ export default function CookingPage() {
       setSession(newSession);
       setGlobalSession(newSession);
       setElapsedTime(0);
-      setIsTimerRunning(false);
+
+      const currentStepData = newSession.steps[newSession.current_step];
+      setIsTimerRunning(true);
+      if (currentStepData?.duration_seconds) {
+        setStepTimer(currentStepData.duration_seconds);
+        setIsStepTimerActive(true);
+      } else {
+        setStepTimer(null);
+        setIsStepTimerActive(false);
+      }
     } catch (error) {
       console.error('Failed to restart:', error);
     }
@@ -344,6 +361,21 @@ export default function CookingPage() {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const finalizeSessionLocally = (targetSession: CookingSession) => {
+    const completedSession: CookingSession = {
+      ...targetSession,
+      status: 'completed',
+      completed_at: targetSession.completed_at || new Date().toISOString(),
+    };
+    addCookingHistory(completedSession, elapsedTime);
+    setSession(completedSession);
+    // 完成后清理全局会话，CookHub 不再显示“继续烹饪”。
+    clearSession();
+    setShowCompletionDialog(false);
+    setIsTimerRunning(false);
+    setIsStepTimerActive(false);
   };
 
   const speakStep = (text: string) => {
@@ -358,18 +390,30 @@ export default function CookingPage() {
 
   const handleCompleteCooking = async () => {
     if (!session) return;
+    finalizeSessionLocally(session);
+
     try {
       await cookingApi.completeSession(session.id, getUserId());
-      addCookingHistory(session, elapsedTime);
-      const updatedSession = { ...session, status: 'completed' as const };
-      setSession(updatedSession);
-      setGlobalSession(updatedSession);
-      setShowCompletionDialog(false);
-      navigate('/cook?tab=recommendations');
     } catch (error) {
       console.error('Failed to complete cooking:', error);
-      navigate('/cook?tab=recommendations');
     }
+
+    navigate('/cook?tab=history');
+  };
+
+  const handleExitCooking = () => {
+    if (!session) {
+      navigate('/cook?tab=recommendations');
+      return;
+    }
+
+    const reachedLastStep = session.current_step >= session.steps.length - 1;
+    if (session.status !== 'completed' && reachedLastStep) {
+      void handleCompleteCooking();
+      return;
+    }
+
+    navigate('/cook?tab=recommendations');
   };
 
   if (isLoading) {
@@ -399,7 +443,7 @@ export default function CookingPage() {
     <div className="animate-fade-in">
       <header className="flex items-center justify-between mb-6">
         <button
-          onClick={() => navigate('/cook?tab=recommendations')}
+          onClick={handleExitCooking}
           className="flex items-center space-x-2 text-gray-600 hover:text-gray-800"
         >
           <ChevronLeft size={20} />
