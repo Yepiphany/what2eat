@@ -7,6 +7,11 @@ import type { Ingredient } from '../types';
 import { incrementScannedIngredients } from '../services/statistics';
 import { getUserId } from '../utils/userId';
 import {
+  expiryDateFromLevel,
+  getExpiryStatus,
+  type ExpiryLevel,
+} from '../utils/expiry';
+import {
   markRecipeCacheDirty,
   requestRecipeForceRefresh,
 } from '../services/recipeCache';
@@ -26,7 +31,7 @@ export default function ScannerPage() {
   const normalizeScannedIngredient = (item: Partial<Ingredient>): Partial<Ingredient> => {
     const parsedEstimatedDays = Number((item as any).estimated_expiry_days);
     const resolvedExpiryDate =
-      item.expiry_date || toExpiryDateByDays(parsedEstimatedDays) || undefined;
+      item.expiry_date || toExpiryDateByDays(parsedEstimatedDays) || expiryDateFromLevel('green');
 
     return {
       ...item,
@@ -323,7 +328,7 @@ export default function ScannerPage() {
         category: 'other',
         quantity: 1,
         unit: '个',
-        expiry_date: undefined,
+        expiry_date: expiryDateFromLevel('green'),
       },
     ]);
   };
@@ -361,6 +366,32 @@ export default function ScannerPage() {
     { value: 'seasoning', label: '调料' },
     { value: 'beverage', label: '饮品' },
     { value: 'other', label: '其他' },
+  ];
+
+  const expiryLevelOptions: Array<{
+    level: ExpiryLevel;
+    label: string;
+    activeClass: string;
+    inactiveClass: string;
+  }> = [
+    {
+      level: 'red',
+      label: '立即吃',
+      activeClass: 'border-red-500 text-red-600',
+      inactiveClass: 'border-transparent text-red-300 hover:text-red-500',
+    },
+    {
+      level: 'yellow',
+      label: '尽快吃',
+      activeClass: 'border-yellow-500 text-yellow-600',
+      inactiveClass: 'border-transparent text-yellow-400 hover:text-yellow-600',
+    },
+    {
+      level: 'green',
+      label: '很新鲜',
+      activeClass: 'border-green-500 text-green-600',
+      inactiveClass: 'border-transparent text-green-400 hover:text-green-600',
+    },
   ];
 
   return (
@@ -439,6 +470,9 @@ export default function ScannerPage() {
                       style={{ maxHeight: `${dynamicHeights.detectedList}px` }}
                     >
                       {detectedIngredients.map((ingredient, index) => (
+                        (() => {
+                          const selectedExpiryLevel = getExpiryStatus(ingredient).level;
+                          return (
                         <div
                           key={index}
                           className="w-full max-w-full flex flex-wrap items-center gap-1.5 md:gap-2 p-2 md:p-2.5 bg-gray-50 rounded-lg"
@@ -492,19 +526,33 @@ export default function ScannerPage() {
                             <X size={16} />
                           </button>
 
-                          <input
-                            type="date"
-                            value={ingredient.expiry_date ? new Date(ingredient.expiry_date).toISOString().split('T')[0] : ''}
-                            onChange={(e) =>
-                              updateIngredient(
-                                index,
-                                'expiry_date',
-                                e.target.value ? `${e.target.value}T23:59:59` : '',
-                              )
-                            }
-                            className="w-full md:w-[168px] px-2 py-1.5 border border-gray-200 rounded-lg text-xs md:text-sm"
-                          />
+                          <div className="w-full">
+                            <div className="grid grid-cols-3 gap-2 w-full border-b border-gray-200">
+                              {expiryLevelOptions.map((item) => (
+                                <button
+                                  key={item.level}
+                                  type="button"
+                                  onClick={() =>
+                                    updateIngredient(
+                                      index,
+                                      'expiry_date',
+                                      expiryDateFromLevel(item.level),
+                                    )
+                                  }
+                                  className={`-mb-px w-full border-b-2 px-1 pb-2 text-xs font-semibold transition-colors ${
+                                    selectedExpiryLevel === item.level
+                                      ? item.activeClass
+                                      : item.inactiveClass
+                                  }`}
+                                >
+                                  {item.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
                         </div>
+                          );
+                        })()
                       ))}
                     </div>
 
