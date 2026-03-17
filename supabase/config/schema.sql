@@ -97,6 +97,20 @@ CREATE TABLE recipe_pages (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- User Memory Profiles Table (persistent personalization archive)
+CREATE TABLE user_memory_profiles (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    favorite_recipes JSONB NOT NULL DEFAULT '[]'::jsonb,
+    history_records JSONB NOT NULL DEFAULT '[]'::jsonb,
+    temporary_goals TEXT[] NOT NULL DEFAULT '{}',
+    long_term_goals TEXT[] NOT NULL DEFAULT '{}',
+    ai_context_notes TEXT[] NOT NULL DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id)
+);
+
 -- Indexes for better query performance
 CREATE INDEX idx_ingredients_user_id ON ingredients(user_id);
 CREATE INDEX idx_ingredients_category ON ingredients(category);
@@ -107,6 +121,7 @@ CREATE INDEX idx_recipes_cooking_time ON recipes(cooking_time);
 CREATE INDEX idx_cooking_sessions_user_id ON cooking_sessions(user_id);
 CREATE INDEX idx_cooking_sessions_status ON cooking_sessions(status);
 CREATE INDEX idx_user_favorites_user_id ON user_favorites(user_id);
+CREATE INDEX idx_user_memory_profiles_user_id ON user_memory_profiles(user_id);
 
 -- Row Level Security (RLS) Policies
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
@@ -116,6 +131,7 @@ ALTER TABLE cooking_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_favorites ENABLE ROW LEVEL SECURITY;
 ALTER TABLE shopping_lists ENABLE ROW LEVEL SECURITY;
 ALTER TABLE recipe_pages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_memory_profiles ENABLE ROW LEVEL SECURITY;
 
 -- Users policies - allow access by id (for local UUID authentication)
 CREATE POLICY "Users can view their own data" ON users
@@ -199,6 +215,19 @@ CREATE POLICY "Anyone can update recipe pages" ON recipe_pages
 CREATE POLICY "Anyone can delete recipe pages" ON recipe_pages
     FOR DELETE USING (true);
 
+-- User memory profile policies
+CREATE POLICY "Anyone can view user memory profiles" ON user_memory_profiles
+    FOR SELECT USING (true);
+
+CREATE POLICY "Anyone can insert user memory profiles" ON user_memory_profiles
+    FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Anyone can update user memory profiles" ON user_memory_profiles
+    FOR UPDATE USING (true);
+
+CREATE POLICY "Anyone can delete user memory profiles" ON user_memory_profiles
+    FOR DELETE USING (true);
+
 -- Function to update updated_at timestamp automatically
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -225,6 +254,9 @@ CREATE TRIGGER update_shopping_lists_updated_at BEFORE UPDATE ON shopping_lists
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_recipe_pages_updated_at BEFORE UPDATE ON recipe_pages
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_user_memory_profiles_updated_at BEFORE UPDATE ON user_memory_profiles
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Insert sample recipes for testing

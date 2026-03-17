@@ -104,6 +104,46 @@ def _get_urgent_ingredient_names(user_id: Optional[str]) -> List[str]:
     except Exception as e:
         print(f"[WARN] Failed to load urgent ingredients for user {user_id}: {e}")
         return []
+def _build_goal_context(
+    user_id: Optional[str],
+    request_temp_goals: Optional[List[str]],
+    request_long_goals: Optional[List[str]],
+) -> Optional[str]:
+    temp_goals = [g.strip() for g in (request_temp_goals or []) if isinstance(g, str) and g.strip()]
+    long_goals = [g.strip() for g in (request_long_goals or []) if isinstance(g, str) and g.strip()]
+
+    if user_id and (not temp_goals and not long_goals):
+        try:
+            result = (
+                supabase.table("user_memory_profiles")
+                .select("temporary_goals,long_term_goals")
+                .eq("user_id", user_id)
+                .limit(1)
+                .execute()
+            )
+            if result.data:
+                temp_goals = [
+                    g.strip()
+                    for g in (result.data[0].get("temporary_goals") or [])
+                    if isinstance(g, str) and g.strip()
+                ]
+                long_goals = [
+                    g.strip()
+                    for g in (result.data[0].get("long_term_goals") or [])
+                    if isinstance(g, str) and g.strip()
+                ]
+        except Exception as e:
+            print(f"[WARN] Failed to fetch goal memory context: {e}")
+
+    if not temp_goals and not long_goals:
+        return None
+
+    segments: List[str] = []
+    if temp_goals:
+        segments.append(f"临时目标/要求: {'；'.join(temp_goals)}")
+    if long_goals:
+        segments.append(f"长期目标: {'；'.join(long_goals)}")
+    return "\n".join(segments)
 
 @router.post("/recommend")
 async def get_recipe_recommendations(request: Request):
@@ -119,6 +159,8 @@ async def get_recipe_recommendations(request: Request):
     max_cooking_time = data.get('max_cooking_time', None)
     cooking_level = data.get('cooking_level', None)
     user_id = data.get('user_id', None)
+    temporary_goals = data.get('temporary_goals', [])
+    long_term_goals = data.get('long_term_goals', [])
     
     merged_ingredients = _merge_ingredients(available_ingredients, preset_ingredients)
     prepared_ingredients = _auto_fill_ingredients(merged_ingredients)
@@ -155,7 +197,8 @@ async def get_recipe_recommendations(request: Request):
         count=10,
         force_refresh=force_refresh,
         max_cooking_time=max_cooking_time,
-        cooking_level=cooking_level
+        cooking_level=cooking_level,
+        memory_context=_build_goal_context(user_id, temporary_goals, long_term_goals),
     )
     return recipes
 

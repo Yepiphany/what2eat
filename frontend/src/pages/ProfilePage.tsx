@@ -9,16 +9,32 @@ import {
     Camera,
     TrendingUp,
     X,
+    BookHeart,
+    History,
+    Target,
+    Plus,
+    Trash2,
 } from "lucide-react";
 import { useUserStore, useIngredientsStore } from "../stores";
-import { userApi } from "../services/api";
+import { memoryApi, userApi } from "../services/api";
 import { getUserId } from "../utils/userId";
-import type { TastePreference, DietType } from "../types";
+import type {
+    TastePreference,
+    DietType,
+    UserMemoryProfile,
+    MemoryGoalType,
+} from "../types";
 import {
     getScannedIngredientsCount,
     getViewedRecipesCount,
 } from "../services/statistics";
 import { getExpiryStatus } from "../utils/expiry";
+import {
+    COOKING_HISTORY_UPDATED_EVENT,
+    FAVORITES_UPDATED_EVENT,
+    getCookingHistory,
+    getFavoriteRecipes,
+} from "../services/cookingLibrary";
 
 const tasteOptions: {
     value: TastePreference;
@@ -103,6 +119,13 @@ export default function ProfilePage() {
     const [selectedLevel, setSelectedLevel] = useState<string | null>(null);
     const [scannedIngredientsCount, setScannedIngredientsCount] = useState(0);
     const [viewedRecipesCount, setViewedRecipesCount] = useState(0);
+    const [memoryProfile, setMemoryProfile] = useState<UserMemoryProfile | null>(
+        null,
+    );
+    const [isMemoryLoading, setIsMemoryLoading] = useState(false);
+    const [isMemorySaving, setIsMemorySaving] = useState(false);
+    const [temporaryGoalInput, setTemporaryGoalInput] = useState("");
+    const [longTermGoalInput, setLongTermGoalInput] = useState("");
 
     const { currentUser, setUser, isAuthenticated, updatePreferences, logout } =
         useUserStore();
@@ -122,6 +145,82 @@ export default function ProfilePage() {
         setScannedIngredientsCount(getScannedIngredientsCount());
         setViewedRecipesCount(getViewedRecipesCount());
     }, [currentUser]);
+
+    useEffect(() => {
+        if (!currentUser) {
+            setMemoryProfile(null);
+            return;
+        }
+
+        let isCancelled = false;
+        const loadMemory = async () => {
+            setIsMemoryLoading(true);
+            try {
+                const profile = await memoryApi.getProfile(getUserId());
+                if (!isCancelled) {
+                    setMemoryProfile(profile);
+                }
+            } catch (error) {
+                console.error("Failed to load memory profile:", error);
+            } finally {
+                if (!isCancelled) {
+                    setIsMemoryLoading(false);
+                }
+            }
+        };
+
+        loadMemory();
+
+        const refreshOnLocalUpdate = () => {
+            void loadMemory();
+        };
+
+        window.addEventListener(FAVORITES_UPDATED_EVENT, refreshOnLocalUpdate);
+        window.addEventListener(
+            COOKING_HISTORY_UPDATED_EVENT,
+            refreshOnLocalUpdate,
+        );
+
+        return () => {
+            isCancelled = true;
+            window.removeEventListener(
+                FAVORITES_UPDATED_EVENT,
+                refreshOnLocalUpdate,
+            );
+            window.removeEventListener(
+                COOKING_HISTORY_UPDATED_EVENT,
+                refreshOnLocalUpdate,
+            );
+        };
+    }, [currentUser]);
+
+    const updateGoal = async (goalType: MemoryGoalType, goal: string, action: "add" | "remove") => {
+        const trimmed = goal.trim();
+        if (!trimmed) {
+            return;
+        }
+
+        setIsMemorySaving(true);
+        try {
+            const profile = await memoryApi.updateGoal(
+                getUserId(),
+                trimmed,
+                goalType,
+                action,
+            );
+            setMemoryProfile(profile);
+            if (goalType === "temporary" && action === "add") {
+                setTemporaryGoalInput("");
+            }
+            if (goalType === "long_term" && action === "add") {
+                setLongTermGoalInput("");
+            }
+        } catch (error) {
+            console.error("Failed to update goal:", error);
+        } finally {
+            setIsMemorySaving(false);
+        }
+    };
 
     const handleSave = async () => {
         setIsSaving(true);
@@ -215,9 +314,12 @@ export default function ProfilePage() {
     const stats = {
         totalIngredients: scannedIngredientsCount,
         recipesViewed: viewedRecipesCount,
-        favoriteRecipes: 12,
-        cookingSessions: 8,
-        totalCookingTime: 320,
+        favoriteRecipes:
+            memoryProfile?.favorite_recipes.length ?? getFavoriteRecipes().length,
+        cookingSessions:
+            memoryProfile?.history_records.length ?? getCookingHistory().length,
+        temporaryGoals: memoryProfile?.temporary_goals.length ?? 0,
+        longTermGoals: memoryProfile?.long_term_goals.length ?? 0,
     };
 
     if (!isAuthenticated || !currentUser) {
@@ -452,6 +554,152 @@ export default function ProfilePage() {
                             </div>
                         </div>
                     </div>
+                </div>
+
+                <div className="card p-6 space-y-5">
+                    <h3 className="font-semibold text-gray-800 flex items-center">
+                        <Target size={20} className="mr-2 text-primary-600" />
+                        AI 记忆档案
+                    </h3>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div className="rounded-xl bg-red-50 p-3">
+                            <div className="flex items-center text-red-600 text-sm">
+                                <BookHeart size={16} className="mr-1" /> 收藏
+                            </div>
+                            <div className="text-2xl font-bold text-red-700 mt-1">
+                                {stats.favoriteRecipes}
+                            </div>
+                        </div>
+                        <div className="rounded-xl bg-blue-50 p-3">
+                            <div className="flex items-center text-blue-600 text-sm">
+                                <History size={16} className="mr-1" /> 历史
+                            </div>
+                            <div className="text-2xl font-bold text-blue-700 mt-1">
+                                {stats.cookingSessions}
+                            </div>
+                        </div>
+                        <div className="rounded-xl bg-orange-50 p-3">
+                            <div className="text-orange-600 text-sm">临时目标</div>
+                            <div className="text-2xl font-bold text-orange-700 mt-1">
+                                {stats.temporaryGoals}
+                            </div>
+                        </div>
+                        <div className="rounded-xl bg-green-50 p-3">
+                            <div className="text-green-600 text-sm">长期目标</div>
+                            <div className="text-2xl font-bold text-green-700 mt-1">
+                                {stats.longTermGoals}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <p className="text-sm font-medium text-gray-700">
+                            临时目标
+                        </p>
+                        <div className="flex gap-2">
+                            <input
+                                value={temporaryGoalInput}
+                                onChange={(e) =>
+                                    setTemporaryGoalInput(e.target.value)
+                                }
+                                placeholder="例如：这周少油少盐"
+                                className="flex-1 h-10 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            />
+                            <button
+                                onClick={() =>
+                                    updateGoal(
+                                        "temporary",
+                                        temporaryGoalInput,
+                                        "add",
+                                    )
+                                }
+                                disabled={isMemorySaving || !temporaryGoalInput.trim()}
+                                className="h-10 px-3 rounded-lg bg-primary-500 text-white disabled:opacity-50"
+                            >
+                                <Plus size={16} />
+                            </button>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {(memoryProfile?.temporary_goals || []).map((goal) => (
+                                <span
+                                    key={`temp-${goal}`}
+                                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-orange-100 text-orange-700 text-sm"
+                                >
+                                    {goal}
+                                    <button
+                                        onClick={() =>
+                                            updateGoal(
+                                                "temporary",
+                                                goal,
+                                                "remove",
+                                            )
+                                        }
+                                        className="text-orange-600 hover:text-orange-800"
+                                        aria-label={`删除目标 ${goal}`}
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <p className="text-sm font-medium text-gray-700">
+                            长期目标
+                        </p>
+                        <div className="flex gap-2">
+                            <input
+                                value={longTermGoalInput}
+                                onChange={(e) => setLongTermGoalInput(e.target.value)}
+                                placeholder="例如：三个月内减脂 5kg"
+                                className="flex-1 h-10 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            />
+                            <button
+                                onClick={() =>
+                                    updateGoal(
+                                        "long_term",
+                                        longTermGoalInput,
+                                        "add",
+                                    )
+                                }
+                                disabled={isMemorySaving || !longTermGoalInput.trim()}
+                                className="h-10 px-3 rounded-lg bg-primary-500 text-white disabled:opacity-50"
+                            >
+                                <Plus size={16} />
+                            </button>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {(memoryProfile?.long_term_goals || []).map((goal) => (
+                                <span
+                                    key={`long-${goal}`}
+                                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-green-100 text-green-700 text-sm"
+                                >
+                                    {goal}
+                                    <button
+                                        onClick={() =>
+                                            updateGoal(
+                                                "long_term",
+                                                goal,
+                                                "remove",
+                                            )
+                                        }
+                                        className="text-green-600 hover:text-green-800"
+                                        aria-label={`删除目标 ${goal}`}
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+
+                    {isMemoryLoading && (
+                        <p className="text-xs text-gray-500">
+                            正在加载个性化档案...
+                        </p>
+                    )}
                 </div>
 
                 {/* settings + about */}

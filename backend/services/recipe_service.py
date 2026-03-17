@@ -369,7 +369,8 @@ async def get_ai_batch_recipes(
     count: int = 3,
     force_refresh: bool = False,
     max_cooking_time: Optional[int] = None,
-    cooking_level: Optional[str] = None
+    cooking_level: Optional[str] = None,
+    memory_context: Optional[str] = None,
 ) -> List[Dict]:
     if not available_ingredients:
         return []
@@ -420,6 +421,7 @@ async def get_ai_batch_recipes(
         
         # 时间限制
         time_str = f"{max_cooking_time}分钟以内" if max_cooking_time else "不限"
+        memory_str = memory_context.strip() if memory_context else "无"
         
         # 根据饮食类型调整菜谱结构
         if diet_type and diet_type.value == "meat_lover":
@@ -462,6 +464,7 @@ async def get_ai_batch_recipes(
 最大烹饪时间: {time_str}
 心想食材(重点优先): {required_ingredients_str if required_ingredients_str else "无"}
 临期食材(剩余1天内，必须优先消耗): {urgent_ingredients_str if urgent_ingredients_str else "无"}
+用户档案目标: {memory_str}
 
 {category_instruction}
 

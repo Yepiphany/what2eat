@@ -1,9 +1,16 @@
 import type {CookingSession, Recipe, RecipeDifficulty} from '../types';
+import {getUserId} from '../utils/userId';
+
+import {memoryApi} from './api';
 
 const FAVORITES_STORAGE_KEY = 'favorite_recipes_v1';
 const HISTORY_STORAGE_KEY = 'cooking_history_v1';
 const FAVORITES_LIMIT = 100;
 const HISTORY_LIMIT = 50;
+const MEMORY_SYNC_DEBOUNCE_MS = 250;
+
+let favoritesSyncTimer: ReturnType<typeof setTimeout>|null = null;
+let historySyncTimer: ReturnType<typeof setTimeout>|null = null;
 
 export const FAVORITES_UPDATED_EVENT = 'favorites-updated';
 export const COOKING_HISTORY_UPDATED_EVENT = 'cooking-history-updated';
@@ -43,6 +50,28 @@ function writeList<T>(storageKey: string, data: T[]): void {
   localStorage.setItem(storageKey, JSON.stringify(data));
 }
 
+function scheduleFavoritesSync(data: FavoriteRecipeItem[]): void {
+  if (favoritesSyncTimer) {
+    clearTimeout(favoritesSyncTimer);
+  }
+  favoritesSyncTimer = setTimeout(() => {
+    void memoryApi.syncFavorites(getUserId(), data).catch((error) => {
+      console.warn('Failed to sync favorite memory snapshot:', error);
+    });
+  }, MEMORY_SYNC_DEBOUNCE_MS);
+}
+
+function scheduleHistorySync(data: CookingHistoryItem[]): void {
+  if (historySyncTimer) {
+    clearTimeout(historySyncTimer);
+  }
+  historySyncTimer = setTimeout(() => {
+    void memoryApi.syncHistory(getUserId(), data).catch((error) => {
+      console.warn('Failed to sync history memory snapshot:', error);
+    });
+  }, MEMORY_SYNC_DEBOUNCE_MS);
+}
+
 export function getFavoriteRecipes(): FavoriteRecipeItem[] {
   const favorites = readList<FavoriteRecipeItem>(FAVORITES_STORAGE_KEY);
   return favorites.sort((a, b) => {
@@ -61,6 +90,7 @@ export function toggleFavoriteRecipe(recipe: Recipe): boolean {
   if (existingIndex >= 0) {
     const updated = favorites.filter((item) => item.id !== recipe.id);
     writeList(FAVORITES_STORAGE_KEY, updated);
+    scheduleFavoritesSync(updated);
     window.dispatchEvent(new Event(FAVORITES_UPDATED_EVENT));
     return false;
   }
@@ -76,6 +106,7 @@ export function toggleFavoriteRecipe(recipe: Recipe): boolean {
 
   const updated = [created, ...favorites].slice(0, FAVORITES_LIMIT);
   writeList(FAVORITES_STORAGE_KEY, updated);
+  scheduleFavoritesSync(updated);
   window.dispatchEvent(new Event(FAVORITES_UPDATED_EVENT));
   return true;
 }
@@ -105,5 +136,6 @@ export function addCookingHistory(
   const deduplicated = history.filter((item) => item.session_id !== session.id);
   const updated = [nextItem, ...deduplicated].slice(0, HISTORY_LIMIT);
   writeList(HISTORY_STORAGE_KEY, updated);
+  scheduleHistorySync(updated);
   window.dispatchEvent(new Event(COOKING_HISTORY_UPDATED_EVENT));
 }

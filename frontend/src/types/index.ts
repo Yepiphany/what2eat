@@ -14,17 +14,8 @@ export interface Ingredient {
   is_expiring_soon?: boolean;
 }
 
-export type IngredientCategory = 
-  | 'vegetable'
-  | 'meat'
-  | 'seafood'
-  | 'dairy'
-  | 'egg'
-  | 'grain'
-  | 'fruit'
-  | 'seasoning'
-  | 'beverage'
-  | 'other';
+export type IngredientCategory =|'vegetable'|'meat'|'seafood'|'dairy'|'egg'|
+    'grain'|'fruit'|'seasoning'|'beverage'|'other';
 
 export interface Recipe {
   id: string;
@@ -47,9 +38,10 @@ export interface Recipe {
   match_percentage?: number;
 }
 
-export type RecipeDifficulty = 'easy' | 'medium' | 'hard';
-export type TastePreference = 'spicy' | 'sweet' | 'sour' | 'salty' | 'umami' | 'mild' | 'bitter';
-export type DietType = 'balanced' | 'meat_lover' | 'vegetable_lover' | 'fitness_meal';
+export type RecipeDifficulty = 'easy'|'medium'|'hard';
+export type TastePreference =
+    'spicy'|'sweet'|'sour'|'salty'|'umami'|'mild'|'bitter';
+export type DietType = 'balanced'|'meat_lover'|'vegetable_lover'|'fitness_meal';
 
 export interface CookingStep {
   step_number: number;
@@ -71,7 +63,8 @@ export interface CookingSession {
   recipe_title: string;
 }
 
-export type CookingSessionStatus = 'not_started' | 'in_progress' | 'paused' | 'completed';
+export type CookingSessionStatus =
+    'not_started'|'in_progress'|'paused'|'completed';
 
 export interface User {
   id: string;
@@ -86,7 +79,40 @@ export interface User {
   updated_at: string;
 }
 
+export interface FavoriteRecipeMemoryItem {
+  id: string;
+  title: string;
+  cooking_time: number;
+  difficulty: RecipeDifficulty;
+  image_url?: string;
+  saved_at: string;
+}
+
+export interface CookingHistoryMemoryItem {
+  session_id: string;
+  recipe_id: string;
+  recipe_title: string;
+  completed_at: string;
+  elapsed_seconds: number;
+}
+
+export interface UserMemoryProfile {
+  user_id: string;
+  favorite_recipes: FavoriteRecipeMemoryItem[];
+  history_records: CookingHistoryMemoryItem[];
+  temporary_goals: string[];
+  long_term_goals: string[];
+  ai_context_notes: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export type MemoryGoalType = 'temporary'|'long_term';
+
+export type MemoryGoalAction = 'add'|'remove';
+
 export interface RecipeRecommendationRequest {
+  user_id?: string;
   available_ingredients: string[];
   required_ingredients?: string[];
   preset_ingredients?: string[];
@@ -96,6 +122,8 @@ export interface RecipeRecommendationRequest {
   max_cooking_time?: number;
   max_difficulty?: RecipeDifficulty;
   cooking_level?: string;
+  temporary_goals?: string[];
+  long_term_goals?: string[];
 }
 
 export interface IngredientPresetResponse {
@@ -111,7 +139,7 @@ export interface ShoppingItem {
   item: string;
   quantity: number;
   unit: string;
-  priority: 'high' | 'medium' | 'low';
+  priority: 'high'|'medium'|'low';
 }
 
 export interface ShoppingList {

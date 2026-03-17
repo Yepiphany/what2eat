@@ -71,9 +71,9 @@ export default function RecipesPage() {
       );
       
       const request = {
+        user_id: getUserId(),
         available_ingredients: filteredIngredients,
         required_ingredients: requiredIngredientNames,
-        user_id: getUserId(),
         force_refresh: forceRefresh,
         taste_preferences: preferences.tastePreferences as TastePreference[],
         diet_type: preferences.dietType as DietType,

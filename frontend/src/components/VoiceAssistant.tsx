@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Mic, MicOff, Send, X } from "lucide-react";
-import { ingredientApi, recipeApi } from "../services/api";
+import { ingredientApi, memoryApi, recipeApi } from "../services/api";
 import { useIngredientsStore, useRecipesStore, useUserStore } from "../stores";
 import { getUserId } from "../utils/userId";
 import {
@@ -13,6 +13,7 @@ import type {
     IngredientCategory,
     DietType,
     TastePreference,
+    UserMemoryProfile,
 } from "../types";
 
 type Message = {
@@ -393,6 +394,9 @@ export default function VoiceAssistant() {
     ]);
     const [actionButton, setActionButton] = useState<ActionButton | null>(null);
     const [awaitingRecommendation, setAwaitingRecommendation] = useState(false);
+    const [memoryProfile, setMemoryProfile] = useState<UserMemoryProfile | null>(
+        null,
+    );
 
     const recognitionRef = useRef<any>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -441,6 +445,21 @@ export default function VoiceAssistant() {
         return () => window.removeEventListener("mousedown", onPointerDown);
     }, [isPanelOpen]);
 
+    const loadMemoryProfile = async (): Promise<UserMemoryProfile | null> => {
+        try {
+            const profile = await memoryApi.getProfile(getUserId());
+            setMemoryProfile(profile);
+            return profile;
+        } catch (error) {
+            console.error("Failed to load memory profile:", error);
+            return null;
+        }
+    };
+
+    useEffect(() => {
+        void loadMemoryProfile();
+    }, []);
+
     const appendMessage = (role: "user" | "assistant", text: string) => {
         setMessages((prev) => [
             ...prev,
@@ -468,6 +487,7 @@ export default function VoiceAssistant() {
 
         try {
             const recipes = await recipeApi.getRecommendations({
+                user_id: getUserId(),
                 available_ingredients: names,
                 required_ingredients: desiredIngredients,
                 user_id: getUserId(),
@@ -478,6 +498,8 @@ export default function VoiceAssistant() {
                     | undefined,
                 max_cooking_time: preferences.maxCookingTime || undefined,
                 cooking_level: preferences.cookingLevel || undefined,
+                temporary_goals: memoryProfile?.temporary_goals || [],
+                long_term_goals: memoryProfile?.long_term_goals || [],
             } as any);
 
             if (!recipes.length) {
@@ -516,6 +538,108 @@ export default function VoiceAssistant() {
 
         const normalized = userText.replace(/\s/g, "");
         const yesIntent = /好|可以|需要|推荐|行|来吧/.test(normalized);
+
+        if (/查看目标|目标列表|有哪些目标|我的目标/.test(normalized)) {
+            const profile = memoryProfile || (await loadMemoryProfile());
+            if (!profile) {
+                const msg = "暂时无法读取你的目标档案，请稍后重试。";
+                appendMessage("assistant", msg);
+                speak(msg);
+                return;
+            }
+
+            const tempGoals = profile.temporary_goals || [];
+            const longGoals = profile.long_term_goals || [];
+            const tempText = tempGoals.length
+                ? `临时目标：${tempGoals.join("；")}`
+                : "临时目标暂未设置";
+            const longText = longGoals.length
+                ? `长期目标：${longGoals.join("；")}`
+                : "长期目标暂未设置";
+            const msg = `${tempText}。${longText}。`;
+            appendMessage("assistant", msg);
+            speak(msg);
+            return;
+        }
+
+        const removeGoalMatch = userText.match(
+            /(?:删除|移除|取消)(?:我的)?(临时目标|短期目标|长期目标|长期计划|长期要求)?[:：\s]*(.+)/,
+        );
+        if (removeGoalMatch) {
+            const goalTypeText = removeGoalMatch[1] || "";
+            const goal = (removeGoalMatch[2] || "").trim();
+            if (!goal) {
+                const msg = "请告诉我具体要删除哪个目标。";
+                appendMessage("assistant", msg);
+                speak(msg);
+                return;
+            }
+            const goalType = /长期/.test(goalTypeText)
+                ? "long_term"
+                : "temporary";
+            try {
+                const profile = await memoryApi.updateGoal(
+                    getUserId(),
+                    goal,
+                    goalType,
+                    "remove",
+                );
+                setMemoryProfile(profile);
+                const msg = `已从${goalType === "long_term" ? "长期" : "临时"}目标中移除：${goal}`;
+                appendMessage("assistant", msg);
+                speak(msg);
+            } catch (error) {
+                console.error("Failed to remove goal:", error);
+                const msg = "删除目标失败，请稍后重试。";
+                appendMessage("assistant", msg);
+                speak(msg);
+            }
+            return;
+        }
+
+        const addGoalMatch = userText.match(
+            /(?:新增|添加|设置)(?:我的)?(临时目标|短期目标|长期目标|长期计划|长期要求|目标|要求|计划)(?:是|为|:|：)?\s*(.+)/,
+        );
+        const rememberGoalMatch = userText.match(
+            /(?:记下|记住)(?:我的)?(临时目标|短期目标|长期目标|长期计划|长期要求)?(?:是|为|:|：)?\s*(.+)/,
+        );
+        const explicitGoalMatch = userText.match(
+            /我的(临时目标|短期目标|长期目标|长期计划|长期要求)(?:是|为)?\s*(.+)/,
+        );
+        const goalMatch = explicitGoalMatch || addGoalMatch || rememberGoalMatch;
+
+        if (goalMatch) {
+            const goalTypeText = goalMatch[1] || "";
+            const goal = (goalMatch[2] || "").trim();
+            if (!goal) {
+                const msg = "请告诉我具体的目标内容。";
+                appendMessage("assistant", msg);
+                speak(msg);
+                return;
+            }
+
+            const goalType = /长期/.test(goalTypeText)
+                ? "long_term"
+                : "temporary";
+            try {
+                const profile = await memoryApi.updateGoal(
+                    getUserId(),
+                    goal,
+                    goalType,
+                    "add",
+                );
+                setMemoryProfile(profile);
+                const msg = `已记住你的${goalType === "long_term" ? "长期" : "临时"}目标：${goal}`;
+                appendMessage("assistant", msg);
+                speak(msg);
+            } catch (error) {
+                console.error("Failed to add goal:", error);
+                const msg = "保存目标失败，请稍后重试。";
+                appendMessage("assistant", msg);
+                speak(msg);
+            }
+            return;
+        }
 
         if (awaitingRecommendation && yesIntent) {
             setAwaitingRecommendation(false);
