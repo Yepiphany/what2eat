@@ -189,10 +189,16 @@ const normalizeIngredientName = (rawName: string): string => {
     }
 
     return normalized
-        .replace(/^(我|又|刚|刚刚|刚买的|新买的|买的|又买的|来点|来份|有|还有|再来|再加|请|帮我|把|给我|一下)+/g, "")
+        .replace(
+            /^(我|又|刚|刚刚|刚买的|新买的|买的|又买的|来点|来份|有|还有|再来|再加|请|帮我|把|给我|一下)+/g,
+            "",
+        )
         .replace(/^(又买了|买了)\s*/g, "")
         .replace(/^(大概|约|大约|差不多)\s*/g, "")
-        .replace(/^(一|二|两|三|四|五|六|七|八|九|十|几|俩|仨)\s*(个|颗|根|只|盒|袋|瓶|块|条|把|份|片)\s*/g, "")
+        .replace(
+            /^(一|二|两|三|四|五|六|七|八|九|十|几|俩|仨)\s*(个|颗|根|只|盒|袋|瓶|块|条|把|份|片)\s*/g,
+            "",
+        )
         .trim();
 };
 
@@ -282,7 +288,7 @@ export default function VoiceAssistant() {
         {
             id: "welcome-2",
             role: "assistant",
-            text: "你可以说：今天买了一棵白菜，三个西红柿，一斤猪肉，一斤鸡蛋！",
+            text: "你可以说：今天买了一颗白菜，三个西红柿，一斤猪肉，一斤鸡蛋！",
         },
         {
             id: "welcome-3",
@@ -499,7 +505,6 @@ export default function VoiceAssistant() {
 
     const startListening = () => {
         if (!supportSpeech) return;
-        setIsPanelOpen(true);
         const Recognition =
             (window as any).SpeechRecognition ||
             (window as any).webkitSpeechRecognition;
@@ -543,7 +548,11 @@ export default function VoiceAssistant() {
                     <button
                         type="button"
                         onClick={() => setIsPanelOpen(true)}
-                        className="w-full h-12 pl-4 pr-14 border border-gray-200 rounded-full text-sm text-left text-gray-500 hover:bg-gray-50 bg-white shadow-sm flex items-center overflow-hidden"
+                        className={`w-full h-12 pl-4 pr-14 border rounded-full text-sm text-left hover:bg-gray-50 bg-white shadow-sm flex items-center overflow-hidden transition-colors duration-200 ${
+                            isListening
+                                ? "border-green-500 ring-2 ring-green-100 text-green-700"
+                                : "border-gray-200 text-gray-500"
+                        }`}
                     >
                         {isListening
                             ? "正在语音识别..."
@@ -552,12 +561,14 @@ export default function VoiceAssistant() {
                     <button
                         onClick={isListening ? stopListening : startListening}
                         disabled={!supportSpeech}
-                        className={`absolute right-1 top-1 h-10 w-10 rounded-full flex items-center justify-center transition-colors shadow-sm ${
+                        className={`absolute right-1 top-1 h-10 w-10 rounded-full flex items-center justify-center shadow-sm transform transition-all duration-200 hover:scale-110 active:scale-95 ${
                             isListening
-                                ? "bg-red-500 text-white"
+                                ? "bg-green-500 text-white scale-110 animate-pulse-soft"
                                 : "bg-primary-500 text-white hover:bg-primary-600"
                         } disabled:opacity-50`}
-                        aria-label={isListening ? "停止语音输入" : "开始语音输入"}
+                        aria-label={
+                            isListening ? "停止语音输入" : "开始语音输入"
+                        }
                     >
                         {isListening ? <MicOff size={18} /> : <Mic size={18} />}
                     </button>
