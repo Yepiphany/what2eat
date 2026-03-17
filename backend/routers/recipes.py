@@ -2,8 +2,11 @@ from fastapi import APIRouter, HTTPException, Request
 from typing import List, Optional
 from pydantic import BaseModel
 from services.recipe_service import enhance_recipe_with_matching, generate_recipe_id, get_recipe_from_database
+from models.database import get_supabase_client
+from datetime import datetime, timezone
 
 router = APIRouter()
+supabase = get_supabase_client()
 
 MIN_RECOMMEND_INGREDIENTS = 15
 AUTO_FILL_PRESET_INGREDIENTS: List[str] = [
@@ -48,6 +51,60 @@ def _auto_fill_ingredients(ingredients: List[str], min_count: int = MIN_RECOMMEN
 
     return filled
 
+
+def _to_utc_datetime(raw_value: str) -> Optional[datetime]:
+    try:
+        if not raw_value:
+            return None
+        parsed = datetime.fromisoformat(str(raw_value).replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+    except Exception:
+        return None
+
+
+def _get_urgent_ingredient_names(user_id: Optional[str]) -> List[str]:
+    if not user_id:
+        return []
+
+    try:
+        result = (
+            supabase.table("ingredients")
+            .select("name, expiry_date")
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+        if not result.data:
+            return []
+
+        now = datetime.now(timezone.utc)
+        urgent: List[str] = []
+        seen: set[str] = set()
+
+        for item in result.data:
+            expiry_raw = item.get("expiry_date")
+            expiry_dt = _to_utc_datetime(expiry_raw)
+            if not expiry_dt:
+                continue
+
+            days_left = (expiry_dt - now).days
+            if days_left <= 1:
+                name = str(item.get("name") or "").strip()
+                if not name:
+                    continue
+                key = name.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                urgent.append(name)
+
+        return urgent
+    except Exception as e:
+        print(f"[WARN] Failed to load urgent ingredients for user {user_id}: {e}")
+        return []
+
 @router.post("/recommend")
 async def get_recipe_recommendations(request: Request):
     from models.recipe_schemas import TastePreference, DietType
@@ -61,9 +118,11 @@ async def get_recipe_recommendations(request: Request):
     force_refresh = data.get('force_refresh', False)
     max_cooking_time = data.get('max_cooking_time', None)
     cooking_level = data.get('cooking_level', None)
+    user_id = data.get('user_id', None)
     
     merged_ingredients = _merge_ingredients(available_ingredients, preset_ingredients)
     prepared_ingredients = _auto_fill_ingredients(merged_ingredients)
+    urgent_ingredients = _get_urgent_ingredient_names(user_id)
 
     if not prepared_ingredients:
         return []
@@ -90,6 +149,7 @@ async def get_recipe_recommendations(request: Request):
         available_ingredients=prepared_ingredients,
         matching_ingredients=available_ingredients,
         required_ingredients=required_ingredients,
+        urgent_ingredients=urgent_ingredients,
         taste_preferences=taste_prefs,
         diet_type=diet_type,
         count=10,

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
     Scan,
@@ -30,6 +30,7 @@ import {
     markRecipeCacheDirty,
     requestRecipeForceRefresh,
 } from "../services/recipeCache";
+import { getExpiryStatus } from "../utils/expiry";
 
 export default function HomePage() {
     const navigate = useNavigate();
@@ -55,8 +56,39 @@ export default function HomePage() {
     const [activeIndex, setActiveIndex] = useState(0);
     const { shoppingLists } = useShoppingLists("pending");
 
-    const expiringSoon = ingredients.filter((ing) => ing.is_expiring_soon);
+    const expiringSoon = ingredients.filter((ing) => {
+        const status = getExpiryStatus(ing);
+        return status.level === "red" || status.level === "yellow";
+    });
     const hasIngredients = ingredients.length > 0;
+
+    const expiryCounts = useMemo(
+        () =>
+            ingredients.reduce(
+                (acc, item) => {
+                    const status = getExpiryStatus(item);
+                    acc[status.level] += 1;
+                    return acc;
+                },
+                { red: 0, yellow: 0, green: 0 },
+            ),
+        [ingredients],
+    );
+
+    const sortedIngredients = useMemo(
+        () =>
+            [...ingredients].sort((a, b) => {
+                const statusA = getExpiryStatus(a);
+                const statusB = getExpiryStatus(b);
+
+                if (statusA.sortPriority !== statusB.sortPriority) {
+                    return statusA.sortPriority - statusB.sortPriority;
+                }
+
+                return a.name.localeCompare(b.name, "zh-CN");
+            }),
+        [ingredients],
+    );
 
     useEffect(() => {
         // 如果 recipePages 为空，从数据库加载
@@ -207,24 +239,25 @@ export default function HomePage() {
                                 {expiringSoon.length > 0 && (
                                     <div className="text-xs text-red-600 bg-red-50/80 p-2.5 rounded-lg font-medium flex items-center shadow-sm">
                                         <ChefHat size={14} className="mr-1.5" />
-                                        {expiringSoon
-                                            .map((i) => i.name)
-                                            .join("、")}{" "}
-                                        即将过期!
+                                        立即吃 {expiryCounts.red} 项 · 尽快吃 {expiryCounts.yellow} 项 · 很新鲜 {expiryCounts.green} 项
                                     </div>
                                 )}
 
                                 {hasIngredients ? (
                                     <div className="flex flex-wrap gap-2 overflow-y-auto max-h-20 scrollbar-hide py-1">
-                                        {ingredients.map((ing) => (
+                                        {sortedIngredients.map((ing) => {
+                                            const status = getExpiryStatus(ing);
+                                            return (
                                             <span
                                                 key={ing.id}
-                                                className={`px-2.5 py-1 rounded-full text-xs shadow-sm border ${ing.is_expiring_soon ? "bg-red-50 border-red-200 text-red-700" : "bg-white border-gray-200 text-gray-700"}`}
+                                                className={`px-2.5 py-1 rounded-full text-xs shadow-sm border inline-flex items-center gap-1 ${status.className}`}
                                             >
                                                 {ing.name} {ing.quantity}
                                                 {ing.unit}
+                                                <span className="font-medium">{status.shortLabel}</span>
                                             </span>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 ) : (
                                     <div className="text-center py-2 text-sm text-gray-400">

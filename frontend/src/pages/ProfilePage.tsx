@@ -18,6 +18,7 @@ import {
     getScannedIngredientsCount,
     getViewedRecipesCount,
 } from "../services/statistics";
+import { getExpiryStatus } from "../utils/expiry";
 
 const tasteOptions: {
     value: TastePreference;
@@ -202,9 +203,17 @@ export default function ProfilePage() {
         window.location.href = "/";
     };
 
+    const expiryLevelStats = ingredients.reduce(
+        (acc, item) => {
+            const status = getExpiryStatus(item);
+            acc[status.level] += 1;
+            return acc;
+        },
+        { red: 0, yellow: 0, green: 0 },
+    );
+
     const stats = {
         totalIngredients: scannedIngredientsCount,
-        expiringSoon: ingredients.filter((ing) => ing.is_expiring_soon).length,
         recipesViewed: viewedRecipesCount,
         favoriteRecipes: 12,
         cookingSessions: 8,
@@ -433,11 +442,13 @@ export default function ProfilePage() {
                         </div>
 
                         <div className="text-center p-4 bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl">
-                            <div className="text-3xl font-bold text-orange-600">
-                                {stats.expiringSoon}
+                            <div className="text-sm font-semibold text-orange-700 space-y-1">
+                                <div>立即吃 {expiryLevelStats.red}</div>
+                                <div>尽快吃 {expiryLevelStats.yellow}</div>
+                                <div>很新鲜 {expiryLevelStats.green}</div>
                             </div>
                             <div className="text-sm text-gray-600">
-                                即将过期
+                                保质期标签
                             </div>
                         </div>
                     </div>

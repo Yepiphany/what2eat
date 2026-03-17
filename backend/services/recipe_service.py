@@ -233,16 +233,27 @@ def enforce_unique_ingredient_usage(recipes: List[Dict], available_ingredients: 
     return updated_recipes
 
 
-def prioritize_recipes_by_match(recipes: List[Dict]) -> List[Dict]:
+def prioritize_recipes_by_match(recipes: List[Dict], urgent_ingredients: Optional[List[str]] = None) -> List[Dict]:
     """
     按“命中用户已有食材”的程度排序：
     1) match_percentage 高的在前
     2) matched_ingredients 多的在前
     3) missing_ingredients 少的在前
     """
+    urgent_clean = [name.strip() for name in (urgent_ingredients or []) if str(name).strip()]
+
+    def urgent_match_count(recipe: Dict) -> int:
+        if not urgent_clean:
+            return 0
+        recipe_ingredients = recipe.get("ingredients", []) or []
+        return sum(
+            1 for urgent in urgent_clean if _contains_ingredient(urgent, recipe_ingredients)
+        )
+
     return sorted(
         recipes,
         key=lambda recipe: (
+            urgent_match_count(recipe),
             float(recipe.get("match_percentage", 0) or 0),
             len(recipe.get("matched_ingredients", []) or []),
             -len(recipe.get("missing_ingredients", []) or []),
@@ -279,6 +290,7 @@ def save_recipe_to_database(recipe: Dict):
     try:
         from models.database import get_supabase_client
         client = get_supabase_client()
+
         _RECIPES_MEMORY[recipe.get("id")] = {
             "id": recipe.get("id"),
             "title": recipe.get("title"),
@@ -294,13 +306,14 @@ def save_recipe_to_database(recipe: Dict):
             "matched_ingredients": recipe.get("matched_ingredients", []),
             "missing_ingredients": recipe.get("missing_ingredients", []),
             "match_percentage": recipe.get("match_percentage", 0),
-            "image_url": recipe.get("image_url")
+            "image_url": recipe.get("image_url"),
         }
+
         if client is None:
             return
-        
+
         existing = client.table("recipes").select("id").eq("id", recipe.get("id")).execute()
-        
+
         data = {
             "id": recipe.get("id"),
             "title": recipe.get("title"),
@@ -316,7 +329,7 @@ def save_recipe_to_database(recipe: Dict):
             "matched_ingredients": recipe.get("matched_ingredients", []),
             "missing_ingredients": recipe.get("missing_ingredients", []),
             "match_percentage": recipe.get("match_percentage", 0),
-            "image_url": recipe.get("image_url")
+            "image_url": recipe.get("image_url"),
         }
         
         if existing.data and len(existing.data) > 0:
@@ -350,6 +363,7 @@ async def get_ai_batch_recipes(
     available_ingredients: List[str],
     matching_ingredients: Optional[List[str]] = None,
     required_ingredients: Optional[List[str]] = None,
+    urgent_ingredients: Optional[List[str]] = None,
     taste_preferences: Optional[List[TastePreference]] = None,
     diet_type: Optional[DietType] = None,
     count: int = 3,
@@ -363,6 +377,9 @@ async def get_ai_batch_recipes(
     effective_matching_ingredients = matching_ingredients or available_ingredients
     effective_required_ingredients = [
         item.strip() for item in (required_ingredients or []) if str(item).strip()
+    ]
+    effective_urgent_ingredients = [
+        item.strip() for item in (urgent_ingredients or []) if str(item).strip()
     ]
     
     ingredients_hash = generate_ingredients_hash(available_ingredients, taste_preferences, diet_type)
@@ -391,6 +408,7 @@ async def get_ai_batch_recipes(
         diet_str = diet_descriptions.get(diet_type.value if diet_type else "balanced", "均衡饮食")
         ingredients_str = ", ".join(available_ingredients)
         required_ingredients_str = ", ".join(effective_required_ingredients)
+        urgent_ingredients_str = ", ".join(effective_urgent_ingredients)
         
         # 烹饪水平描述
         level_descriptions = {
@@ -443,6 +461,7 @@ async def get_ai_batch_recipes(
 烹饪水平: {level_str}
 最大烹饪时间: {time_str}
 心想食材(重点优先): {required_ingredients_str if required_ingredients_str else "无"}
+临期食材(剩余1天内，必须优先消耗): {urgent_ingredients_str if urgent_ingredients_str else "无"}
 
 {category_instruction}
 
@@ -455,6 +474,7 @@ async def get_ai_batch_recipes(
 6. missing_ingredients 中忽略常见调味品（如盐、糖、生抽、料酒、葱姜蒜等）和水；仅在缺少菜品特色调味品时提示（如豆瓣酱、咖喱、孜然、沙茶酱等）
 7. 5道菜整体设计时，现有食材要尽量分散使用：每种“现有食材”最多只在1道菜中作为可命中食材出现，避免同一现有食材在多道菜重复占用
 8. 如果存在“心想食材”，这是本次推荐的特别强调项：请优先围绕这些食材设计菜品，推荐的若干菜谱中必须包含有使用这些食材的菜品，并在菜名、描述或配料中清晰体现；同时保持菜谱多样性，不要只返回这一类菜品
+9. 如果存在“临期食材(剩余1天内)”，必须优先使用这些食材。
 
 严格按照JSON数组格式返回：
 
@@ -605,7 +625,7 @@ async def get_ai_batch_recipes(
         if all_recipes:
             all_recipes = prioritize_recipes_by_required_ingredients(all_recipes, effective_required_ingredients)
             all_recipes = enforce_unique_ingredient_usage(all_recipes, effective_matching_ingredients)
-            all_recipes = prioritize_recipes_by_match(all_recipes)
+            all_recipes = prioritize_recipes_by_match(all_recipes, effective_urgent_ingredients)
             save_recipes_to_cache(ingredients_hash, available_ingredients, all_recipes, taste_preferences, diet_type)
         
         return all_recipes[:count]

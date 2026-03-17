@@ -11,6 +11,7 @@ import {
   markRecipeCacheDirty,
   requestRecipeForceRefresh,
 } from '../services/recipeCache';
+import {expiryDateFromLevel, getExpiryStatus, type ExpiryLevel} from '../utils/expiry';
 
 const categoryLabels: Record<string, string> = {
   vegetable: '蔬菜',
@@ -54,17 +55,47 @@ export default function FoodPage() {
   const [showClearConfirmDialog, setShowClearConfirmDialog] = useState(false);
   const [showRecipeRefreshDialog, setShowRecipeRefreshDialog] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [expiryFilter, setExpiryFilter] = useState<'all' | ExpiryLevel>('all');
   const [newIngredient, setNewIngredient] = useState({
     name: '',
     quantity: 1,
     unit: '个',
     category: 'other',
+    expiry_level: 'green' as ExpiryLevel,
   });
 
-  const expiringSoon = useMemo(
-      () => ingredients.filter((item) => item.is_expiring_soon),
+  const expiryCounts = useMemo(() => {
+    return ingredients.reduce(
+      (acc, item) => {
+        const status = getExpiryStatus(item);
+        acc[status.level] += 1;
+        return acc;
+      },
+      { red: 0, yellow: 0, green: 0 },
+    );
+  }, [ingredients]);
+
+  const sortedIngredients = useMemo(
+      () =>
+        [...ingredients].sort((a, b) => {
+          const statusA = getExpiryStatus(a);
+          const statusB = getExpiryStatus(b);
+
+          if (statusA.sortPriority !== statusB.sortPriority) {
+            return statusA.sortPriority - statusB.sortPriority;
+          }
+
+          return a.name.localeCompare(b.name, 'zh-CN');
+        }),
       [ingredients],
   );
+
+  const displayIngredients = useMemo(() => {
+    if (expiryFilter === 'all') {
+      return sortedIngredients;
+    }
+    return sortedIngredients.filter((item) => getExpiryStatus(item).level === expiryFilter);
+  }, [expiryFilter, sortedIngredients]);
 
   useEffect(() => {
     const loadAllIngredients = async () => {
@@ -87,13 +118,16 @@ export default function FoodPage() {
     setIsAdding(true);
     try {
       const saved = await ingredientApi.addIngredient(
-          newIngredient as Partial<Ingredient>,
+          {
+            ...newIngredient,
+            expiry_date: expiryDateFromLevel(newIngredient.expiry_level),
+          } as Partial<Ingredient>,
           getUserId(),
       );
       addIngredient(saved);
       markRecipeCacheDirty();
       setShowAddForm(false);
-      setNewIngredient({name: '', quantity: 1, unit: '个', category: 'other'});
+      setNewIngredient({name: '', quantity: 1, unit: '个', category: 'other', expiry_level: 'green'});
       setShowRecipeRefreshDialog(true);
     } catch (error) {
       console.error('Failed to add ingredient:', error);
@@ -189,11 +223,45 @@ export default function FoodPage() {
           </div>
         </div>
 
-        {expiringSoon.length > 0 && (
-            <div className="mb-4 p-3 rounded-lg bg-orange-50 border border-orange-100 flex items-center gap-2 text-orange-700 text-sm">
-              <AlertTriangle size={16}/>
-              有 {expiringSoon.length} 项食材临近过期，建议优先使用
-            </div>
+        {ingredients.length > 0 && (
+          <div className="mb-4 grid grid-cols-4 gap-2 w-full border-b border-gray-200">
+            {[
+              {
+                key: 'all',
+                label: `全部 ${ingredients.length}`,
+                activeClass: 'border-gray-600 text-gray-700',
+                inactiveClass: 'border-transparent text-gray-400 hover:text-gray-600',
+              },
+              {
+                key: 'red',
+                label: `立即吃 ${expiryCounts.red}`,
+                activeClass: 'border-red-500 text-red-600',
+                inactiveClass: 'border-transparent text-red-300 hover:text-red-500',
+              },
+              {
+                key: 'yellow',
+                label: `尽快吃 ${expiryCounts.yellow}`,
+                activeClass: 'border-yellow-500 text-yellow-600',
+                inactiveClass: 'border-transparent text-yellow-400 hover:text-yellow-600',
+              },
+              {
+                key: 'green',
+                label: `很新鲜 ${expiryCounts.green}`,
+                activeClass: 'border-green-500 text-green-600',
+                inactiveClass: 'border-transparent text-green-400 hover:text-green-600',
+              },
+            ].map((item) => (
+              <button
+                key={item.key}
+                onClick={() => setExpiryFilter(item.key as typeof expiryFilter)}
+                className={`-mb-px w-full border-b-2 px-1 pb-2 text-xs font-semibold transition-colors ${
+                  expiryFilter === item.key ? item.activeClass : item.inactiveClass
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
         )}
 
         {showAddForm && (
@@ -266,6 +334,44 @@ export default function FoodPage() {
                     <option value="other">其他</option>
                   </select>
                 </div>
+                <div className="w-full md:basis-full">
+                  <label className="block text-sm text-gray-600 mb-1">保质期标签</label>
+                  <div className="grid grid-cols-3 gap-2 w-full border-b border-gray-200">
+                    {[
+                      {
+                        level: 'red',
+                        label: '立即吃',
+                        activeClass: 'border-red-500 text-red-600',
+                        inactiveClass: 'border-transparent text-red-300 hover:text-red-500',
+                      },
+                      {
+                        level: 'yellow',
+                        label: '尽快吃',
+                        activeClass: 'border-yellow-500 text-yellow-600',
+                        inactiveClass: 'border-transparent text-yellow-400 hover:text-yellow-600',
+                      },
+                      {
+                        level: 'green',
+                        label: '很新鲜',
+                        activeClass: 'border-green-500 text-green-600',
+                        inactiveClass: 'border-transparent text-green-400 hover:text-green-600',
+                      },
+                    ].map((item) => (
+                      <button
+                        key={item.level}
+                        type="button"
+                        onClick={() =>
+                          setNewIngredient((prev) => ({...prev, expiry_level: item.level as ExpiryLevel}))
+                        }
+                        className={`-mb-px w-full border-b-2 px-1 pb-2 text-xs font-semibold transition-colors ${
+                          newIngredient.expiry_level === item.level ? item.activeClass : item.inactiveClass
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div className="flex items-center space-x-2 self-end">
                   <button
                       onClick={() => setShowAddForm(false)}
@@ -293,7 +399,9 @@ export default function FoodPage() {
             </div>
         ) : (
             <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-              {ingredients.map((ing) => (
+              {displayIngredients.map((ing) => {
+                const expiryStatus = getExpiryStatus(ing);
+                return (
                   <div
                       key={ing.id}
                       className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
@@ -308,12 +416,14 @@ export default function FoodPage() {
                         <div className="text-sm md:text-base font-medium text-gray-800 truncate">
                           {ing.name}
                         </div>
-                        <div className="text-xs md:text-sm text-gray-500 truncate">
-                          {ing.quantity}
-                          {ing.unit} · {' '}
-                          {ing.expiry_date
-                            ? `保质期至 ${new Date(ing.expiry_date).toLocaleDateString()}`
-                            : '未设置保质期'}
+                        <div className="text-xs md:text-sm text-gray-500 truncate flex items-center gap-2">
+                          <span>
+                            {ing.quantity}
+                            {ing.unit}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded-full border text-xs font-medium ${expiryStatus.className}`}>
+                            {expiryStatus.shortLabel}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -324,7 +434,8 @@ export default function FoodPage() {
                       <Trash2 size={18}/>
                     </button>
                   </div>
-              ))}
+                );
+              })}
             </div>
         )}
       </section>

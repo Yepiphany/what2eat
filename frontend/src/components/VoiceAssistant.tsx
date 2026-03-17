@@ -470,6 +470,7 @@ export default function VoiceAssistant() {
             const recipes = await recipeApi.getRecommendations({
                 available_ingredients: names,
                 required_ingredients: desiredIngredients,
+                user_id: getUserId(),
                 taste_preferences:
                     preferences.tastePreferences as TastePreference[],
                 diet_type: (preferences.dietType || undefined) as
@@ -657,6 +658,43 @@ export default function VoiceAssistant() {
 
         if (/推荐菜谱|推荐做什么|吃什么|推荐一下/.test(normalized)) {
             await recommendRecipes();
+            return;
+        }
+
+        if (
+            /立即吃|快坏了|快到期|要过期|保质期快到了|哪些要先吃/.test(
+                normalized,
+            )
+        ) {
+            const urgent = ingredients.filter(
+                (item) => typeof item.days_until_expiry === "number" && item.days_until_expiry <= 1,
+            );
+            const soon = ingredients.filter(
+                (item) =>
+                    typeof item.days_until_expiry === "number" &&
+                    item.days_until_expiry > 1 &&
+                    item.days_until_expiry <= 3,
+            );
+
+            if (!urgent.length && !soon.length) {
+                const msg = "当前没有检测到临期食材，库存状态看起来不错。";
+                appendMessage("assistant", msg);
+                speak(msg);
+                return;
+            }
+
+            const urgentText = urgent.length
+                ? `建议立即吃：${urgent.map((item) => item.name).join("、")}`
+                : "";
+            const soonText = soon.length
+                ? `接下来几天优先吃：${soon
+                      .slice(0, 5)
+                      .map((item) => item.name)
+                      .join("、")}`
+                : "";
+            const message = [urgentText, soonText].filter(Boolean).join("；");
+            appendMessage("assistant", message);
+            speak(message);
             return;
         }
 

@@ -4,6 +4,7 @@ import { Clock, X, RefreshCw, Trash2 } from 'lucide-react';
 import { useIngredientsStore, useRecipesStore, useUserStore } from '../stores';
 import { recipeApi } from '../services/api';
 import type { Recipe, DietType, TastePreference } from '../types';
+import { getUserId } from '../utils/userId';
 import {
   clearRecipeCacheDirty,
   consumeRecipeForceRefreshRequest,
@@ -72,6 +73,7 @@ export default function RecipesPage() {
       const request = {
         available_ingredients: filteredIngredients,
         required_ingredients: requiredIngredientNames,
+        user_id: getUserId(),
         force_refresh: forceRefresh,
         taste_preferences: preferences.tastePreferences as TastePreference[],
         diet_type: preferences.dietType as DietType,

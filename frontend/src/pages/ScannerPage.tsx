@@ -15,6 +15,28 @@ export default function ScannerPage() {
   const navigate = useNavigate();
   const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
+  const toExpiryDateByDays = (days: number): string | undefined => {
+    if (!Number.isFinite(days) || days <= 0) return undefined;
+    const dt = new Date();
+    dt.setDate(dt.getDate() + Math.floor(days));
+    dt.setHours(23, 59, 59, 0);
+    return dt.toISOString();
+  };
+
+  const normalizeScannedIngredient = (item: Partial<Ingredient>): Partial<Ingredient> => {
+    const parsedEstimatedDays = Number((item as any).estimated_expiry_days);
+    const resolvedExpiryDate =
+      item.expiry_date || toExpiryDateByDays(parsedEstimatedDays) || undefined;
+
+    return {
+      ...item,
+      quantity: typeof item.quantity === 'number' && Number.isFinite(item.quantity) ? item.quantity : 1,
+      unit: item.unit || '个',
+      category: item.category || 'other',
+      expiry_date: resolvedExpiryDate,
+    };
+  };
+
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -218,7 +240,7 @@ export default function ScannerPage() {
     
     try {
       const data = await ingredientApi.scanImageBase64(imageBase64);
-      setDetectedIngredients(data);
+      setDetectedIngredients(data.map((item) => normalizeScannedIngredient(item)));
     } catch (err) {
       console.error('Analysis error:', err);
       setError('图像分析失败，请重试或使用其他照片');
@@ -228,6 +250,7 @@ export default function ScannerPage() {
           category: 'vegetable',
           quantity: 1,
           unit: '个',
+          expiry_date: toExpiryDateByDays(3),
         },
       ]);
     } finally {
@@ -242,7 +265,16 @@ export default function ScannerPage() {
   };
 
   const saveIngredients = async () => {
-    const validIngredients = detectedIngredients.filter(ing => ing.name && ing.name.trim() !== '');
+    const validIngredients = detectedIngredients
+      .filter(ing => ing.name && ing.name.trim() !== '')
+      .map((ing) => ({
+        ...ing,
+        expiry_date: ing.expiry_date
+          ? (String(ing.expiry_date).includes('T')
+            ? ing.expiry_date
+            : `${ing.expiry_date}T23:59:59`)
+          : undefined,
+      }));
     
     if (validIngredients.length === 0) {
       setError('请至少添加一种食材名称');
@@ -291,6 +323,7 @@ export default function ScannerPage() {
         category: 'other',
         quantity: 1,
         unit: '个',
+        expiry_date: undefined,
       },
     ]);
   };
@@ -458,6 +491,19 @@ export default function ScannerPage() {
                           >
                             <X size={16} />
                           </button>
+
+                          <input
+                            type="date"
+                            value={ingredient.expiry_date ? new Date(ingredient.expiry_date).toISOString().split('T')[0] : ''}
+                            onChange={(e) =>
+                              updateIngredient(
+                                index,
+                                'expiry_date',
+                                e.target.value ? `${e.target.value}T23:59:59` : '',
+                              )
+                            }
+                            className="w-full md:w-[168px] px-2 py-1.5 border border-gray-200 rounded-lg text-xs md:text-sm"
+                          />
                         </div>
                       ))}
                     </div>
@@ -552,7 +598,7 @@ export default function ScannerPage() {
               </li>
               <li className="flex items-start space-x-2">
                 <span className="text-primary-600">•</span>
-                <span>定期更新库存，系统会提醒即将过期的食材</span>
+                <span>定期更新库存，系统会用红黄绿标签提示保质期状态</span>
               </li>
             </ul>
           )}
