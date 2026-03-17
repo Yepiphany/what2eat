@@ -84,10 +84,10 @@ export default function HomePage() {
 
     const cardActions: Record<string, { to: string; label: string }> = {
         scan: { to: "/scan", label: "去扫描" },
-        recommend: { to: "/cook/recommendations", label: "查看推荐" },
+        recommend: { to: "/cook?tab=recommendations", label: "查看推荐" },
         inventory: { to: "/food", label: "查看库存" },
         shopping: { to: "/food/shopping", label: "前往采购" },
-        continueCook: { to: "/cook", label: "继续烹饪" },
+        continueCook: { to: "/cook?tab=cooking", label: "继续烹饪" },
         stats: { to: "/profile#today-stats", label: "查看统计" },
         profile: { to: "/profile", label: "个性化设置" },
     };
@@ -131,11 +131,11 @@ export default function HomePage() {
     return (
         <div className="relative h-[calc(100dvh-var(--layout-top-space)-var(--layout-nav-space))] w-full overflow-y-auto overflow-x-hidden animate-fade-in flex flex-col items-center bg-transparent">
             <div className="relative w-[100%] h-[calc(100%+120px)] pt-2 pb-4">
-                <div className="relative z-20 -mt-16 mb-1 flex items-center justify-center">
+                <div className="relative z-20 -mt-16 mb-1 flex items-center justify-center pointer-events-none">
                     <img
                         src={headTitleImage}
                         alt="今天吃什么"
-                        className="block h-[20rem] w-auto object-contain"
+                        className="block h-[20rem] w-auto object-contain pointer-events-none"
                     />
                 </div>
                 {[
@@ -451,14 +451,26 @@ export default function HomePage() {
                                             {activeDescription}
                                         </p>
                                     </div>
-                                    <Link
-                                        to={activeAction.to}
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            navigate(activeAction.to);
+                                            // Fallback for cases where router navigation is swallowed by gesture/click layers.
+                                            requestAnimationFrame(() => {
+                                                const current = `${window.location.pathname}${window.location.hash}`;
+                                                if (current !== activeAction.to) {
+                                                    window.location.assign(activeAction.to);
+                                                }
+                                            });
+                                        }}
                                         aria-label={activeAction.label}
                                         title={activeAction.label}
                                         className={`ml-4 w-11 h-11 rounded-full text-white flex items-center justify-center shadow-md transition-colors flex-shrink-0 ${activeActionStyle}`}
                                     >
                                         <ArrowRight size={18} />
-                                    </Link>
+                                    </button>
                                 </div>
                             ) : (
                                 <div className="absolute inset-x-0 bottom-0 h-1/3 flex items-center px-4 bg-white/65 backdrop-blur-xl border-t border-white/70 transition-all duration-500">

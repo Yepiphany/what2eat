@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { BookHeart, ChefHat, Clock3, Flame, History, PlayCircle } from "lucide-react";
 import { useCookingStore, useRecipesStore } from "../stores";
 import {
@@ -20,11 +20,28 @@ const difficultyLabels: Record<string, string> = {
 
 type CookTab = "recommendations" | "cooking" | "history" | "favorites";
 
+const validTabs: CookTab[] = [
+    "recommendations",
+    "cooking",
+    "history",
+    "favorites",
+];
+
+function parseTab(value: string | null): CookTab {
+    if (value && validTabs.includes(value as CookTab)) {
+        return value as CookTab;
+    }
+    return "recommendations";
+}
+
 export default function CookHubPage() {
     const { currentSession } = useCookingStore();
     const { recipePages, recommendations } = useRecipesStore();
+    const [searchParams, setSearchParams] = useSearchParams();
 
-    const [activeTab, setActiveTab] = useState<CookTab>("recommendations");
+    const [activeTab, setActiveTab] = useState<CookTab>(() =>
+        parseTab(searchParams.get("tab")),
+    );
     const [historyRecords, setHistoryRecords] = useState<CookingHistoryItem[]>(() => getCookingHistory());
     const [favoriteRecipes, setFavoriteRecipes] = useState<FavoriteRecipeItem[]>(() => getFavoriteRecipes());
 
@@ -44,6 +61,13 @@ export default function CookHubPage() {
             window.removeEventListener(FAVORITES_UPDATED_EVENT, syncFavorites);
         };
     }, []);
+
+    useEffect(() => {
+        const nextTab = parseTab(searchParams.get("tab"));
+        if (nextTab !== activeTab) {
+            setActiveTab(nextTab);
+        }
+    }, [searchParams, activeTab]);
 
     const recommendationCount =
         recipePages.reduce((sum, page) => sum + page.length, 0) || recommendations.length;
@@ -67,7 +91,10 @@ export default function CookHubPage() {
                         return (
                             <button
                                 key={tab.key}
-                                onClick={() => setActiveTab(tab.key)}
+                                onClick={() => {
+                                    setActiveTab(tab.key);
+                                    setSearchParams({ tab: tab.key });
+                                }}
                                 className={`-mb-px border-b-2 px-1 pb-3 text-sm md:text-base font-semibold transition-colors ${
                                     isActive
                                         ? "border-primary-500 text-primary-600"
@@ -117,7 +144,10 @@ export default function CookHubPage() {
                             <p className="font-medium text-gray-700">暂无进行中的烹饪</p>
                             <p className="text-sm text-gray-500 mt-1">从推荐菜谱中选择一道菜开始吧</p>
                             <button
-                                onClick={() => setActiveTab("recommendations")}
+                                onClick={() => {
+                                    setActiveTab("recommendations");
+                                    setSearchParams({ tab: "recommendations" });
+                                }}
                                 className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600 transition-colors"
                             >
                                 <ChefHat size={18} />
