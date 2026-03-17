@@ -83,7 +83,7 @@ async def get_ingredient_presets():
 async def add_ingredient(ingredient: IngredientCreate, user_id: str):
     try:
         ensure_user_exists(user_id)
-        data = ingredient.model_dump()
+        data = ingredient.model_dump(mode="json")
         data["user_id"] = user_id
         
         result = supabase.table("ingredients").insert(data).execute()
@@ -133,7 +133,7 @@ async def add_ingredients_batch(ingredients: List[IngredientCreate], user_id: st
         ensure_user_exists(user_id)
         payload = []
         for ingredient in ingredients:
-            data = ingredient.model_dump()
+            data = ingredient.model_dump(mode="json")
             data["user_id"] = user_id
             payload.append(data)
 
@@ -239,7 +239,7 @@ async def clear_all_ingredients(user_id: str):
 @router.put("/{ingredient_id}", response_model=IngredientResponse)
 async def update_ingredient(ingredient_id: str, ingredient: IngredientCreate, user_id: str):
     try:
-        data = ingredient.model_dump()
+        data = ingredient.model_dump(mode="json")
         data["user_id"] = user_id
         
         result = supabase.table("ingredients").update(data).eq("id", ingredient_id).execute()

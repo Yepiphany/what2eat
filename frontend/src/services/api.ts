@@ -5,6 +5,59 @@ import {getUserId} from '../utils/userId';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
+function toErrorMessage(error: unknown, fallback: string): string {
+  if (axios.isAxiosError(error)) {
+    const payload = error.response?.data;
+    if (typeof payload === 'string' && payload.trim()) {
+      return payload;
+    }
+
+    if (payload && typeof payload === 'object') {
+      const payloadObj = payload as Record<string, unknown>;
+      const detail = payloadObj.detail;
+      if (typeof detail === 'string' && detail.trim()) {
+        return detail;
+      }
+
+      if (Array.isArray(detail)) {
+        const joined = detail
+                           .map((item) => {
+                             if (typeof item === 'string') {
+                               return item;
+                             }
+                             if (item && typeof item === 'object') {
+                               const itemObj = item as Record<string, unknown>;
+                               if (typeof itemObj.msg === 'string') {
+                                 return itemObj.msg;
+                               }
+                             }
+                             return '';
+                           })
+                           .filter(Boolean)
+                           .join('；');
+        if (joined) {
+          return joined;
+        }
+      }
+
+      const message = payloadObj.message;
+      if (typeof message === 'string' && message.trim()) {
+        return message;
+      }
+    }
+
+    if (error.message) {
+      return error.message;
+    }
+  }
+
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return fallback;
+}
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 120000,
@@ -73,23 +126,7 @@ export const ingredientApi = {
       });
       return response.data;
     } catch (e) {
-      console.warn('Add ingredient failed, using local fallback:', e);
-      const now = new Date().toISOString();
-      return {
-        id: `${Date.now()}`,
-        user_id: userId,
-        name: ingredient.name || '未命名食材',
-        category: (ingredient as any).category || 'other',
-        quantity:
-            typeof ingredient.quantity === 'number' ? ingredient.quantity : 1,
-        unit: ingredient.unit || '个',
-        expiry_date: ingredient.expiry_date || null,
-        image_url: ingredient.image_url || null,
-        created_at: now as any,
-        updated_at: now as any,
-        days_until_expiry: null,
-        is_expiring_soon: false,
-      } as unknown as Ingredient;
+      throw new Error(toErrorMessage(e, '保存食材失败'));
     }
   },
 
@@ -116,12 +153,27 @@ export const ingredientApi = {
               (ingredient) => ingredientApi.addIngredient(ingredient, userId),
               ),
       );
-      return settled
-          .filter(
-              (result): result is PromiseFulfilledResult<Ingredient> =>
-                  result.status === 'fulfilled',
-              )
-          .map((result) => result.value);
+      const successfulItems =
+          settled
+              .filter(
+                  (result): result is PromiseFulfilledResult<Ingredient> =>
+                      result.status === 'fulfilled',
+                  )
+              .map((result) => result.value);
+
+      if (successfulItems.length > 0) {
+        return successfulItems;
+      }
+
+      const failedItem = settled.find(
+          (result): result is PromiseRejectedResult =>
+              result.status === 'rejected',
+      );
+      if (failedItem?.reason instanceof Error) {
+        throw failedItem.reason;
+      }
+
+      throw new Error(toErrorMessage(e, '批量保存食材失败'));
     }
   },
 

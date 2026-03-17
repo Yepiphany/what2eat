@@ -3,7 +3,7 @@ import { X, RefreshCw, Check, AlertTriangle, Plus, ChevronDown, ChevronUp, Arrow
 import { useNavigate } from 'react-router-dom';
 import { useIngredientsStore } from '../stores';
 import { ingredientApi } from '../services/api';
-import type { Ingredient } from '../types';
+import type { Ingredient, IngredientCategory } from '../types';
 import { incrementScannedIngredients } from '../services/statistics';
 import { getUserId } from '../utils/userId';
 import {
@@ -15,6 +15,62 @@ import {
   markRecipeCacheDirty,
   requestRecipeForceRefresh,
 } from '../services/recipeCache';
+
+const CATEGORY_ALIASES: Record<string, IngredientCategory> = {
+  vegetable: 'vegetable',
+  vegetables: 'vegetable',
+  veg: 'vegetable',
+  '蔬菜': 'vegetable',
+  '青菜': 'vegetable',
+  meat: 'meat',
+  meats: 'meat',
+  '肉类': 'meat',
+  '肉': 'meat',
+  seafood: 'seafood',
+  '海鲜': 'seafood',
+  dairy: 'dairy',
+  milk: 'dairy',
+  '奶制品': 'dairy',
+  '乳制品': 'dairy',
+  egg: 'egg',
+  eggs: 'egg',
+  '蛋类': 'egg',
+  '蛋': 'egg',
+  grain: 'grain',
+  grains: 'grain',
+  '谷物': 'grain',
+  fruit: 'fruit',
+  fruits: 'fruit',
+  '水果': 'fruit',
+  seasoning: 'seasoning',
+  spice: 'seasoning',
+  spices: 'seasoning',
+  condiment: 'seasoning',
+  '调味': 'seasoning',
+  '调味品': 'seasoning',
+  '调料': 'seasoning',
+  beverage: 'beverage',
+  beverages: 'beverage',
+  drink: 'beverage',
+  drinks: 'beverage',
+  '饮品': 'beverage',
+  other: 'other',
+  '其他': 'other',
+};
+
+function normalizeIngredientCategory(category: unknown): IngredientCategory {
+  if (typeof category !== 'string') {
+    return 'other';
+  }
+
+  const raw = category.trim();
+  if (!raw) {
+    return 'other';
+  }
+
+  const normalizedKey = raw.toLowerCase().replace(/[\s_-]+/g, '');
+  return CATEGORY_ALIASES[normalizedKey] || CATEGORY_ALIASES[raw] || 'other';
+}
 
 export default function ScannerPage() {
   const navigate = useNavigate();
@@ -37,7 +93,7 @@ export default function ScannerPage() {
       ...item,
       quantity: typeof item.quantity === 'number' && Number.isFinite(item.quantity) ? item.quantity : 1,
       unit: item.unit || '个',
-      category: item.category || 'other',
+      category: normalizeIngredientCategory(item.category),
       expiry_date: resolvedExpiryDate,
     };
   };
@@ -274,6 +330,7 @@ export default function ScannerPage() {
       .filter(ing => ing.name && ing.name.trim() !== '')
       .map((ing) => ({
         ...ing,
+        category: normalizeIngredientCategory(ing.category),
         expiry_date: ing.expiry_date
           ? (String(ing.expiry_date).includes('T')
             ? ing.expiry_date
@@ -310,7 +367,7 @@ export default function ScannerPage() {
       }
     } catch (err) {
       console.error('Save error:', err);
-      setError('保存失败，请检查网络连接');
+      setError(err instanceof Error ? err.message : '保存失败，请检查网络连接');
     } finally {
       setIsSaving(false);
     }

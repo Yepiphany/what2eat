@@ -157,6 +157,9 @@ export default function FoodPage() {
             setShowRecipeRefreshDialog(true);
         } catch (error) {
             console.error("Failed to add ingredient:", error);
+            window.alert(
+                `保存失败：${error instanceof Error ? error.message : "请检查后端或数据库配置"}`,
+            );
         } finally {
             setIsAdding(false);
         }
