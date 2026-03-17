@@ -466,10 +466,6 @@ export default function HomePage() {
 
                                 if (!isActive) {
                                     setActiveIndex(index);
-                                    // Simulate tapping the enter button after the card moves to top.
-                                    window.setTimeout(() => {
-                                        navigate(activeAction.to);
-                                    }, 520);
                                 }
                             }}
                             className={`absolute left-0 right-0 rounded-3xl transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] shadow-[0_8px_30px_rgb(0,0,0,0.12)] overflow-hidden cursor-pointer backdrop-blur-xl bg-white/70 ${isActive ? `border-2 ${card.bgBorder}` : "border border-gray-200/70"}`}
