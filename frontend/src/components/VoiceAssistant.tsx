@@ -401,6 +401,7 @@ export default function VoiceAssistant() {
     const recognitionRef = useRef<any>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const messagesRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     const supportSpeech = useMemo(
         () =>
@@ -829,6 +830,7 @@ export default function VoiceAssistant() {
     };
 
     const startListening = () => {
+        setIsPanelOpen(true);
         if (!supportSpeech) return;
         const Recognition =
             (window as any).SpeechRecognition ||
@@ -843,8 +845,15 @@ export default function VoiceAssistant() {
         recognition.onend = () => setIsListening(false);
         recognition.onerror = () => setIsListening(false);
         recognition.onresult = (event: any) => {
-            const transcript = event.results?.[0]?.[0]?.transcript || "";
-            handleCommand(transcript);
+            const transcript = (event.results?.[0]?.[0]?.transcript || "").trim();
+            if (!transcript) return;
+            setInput((prev) => {
+                if (!prev.trim()) return transcript;
+                return `${prev.trim()} ${transcript}`;
+            });
+            requestAnimationFrame(() => {
+                inputRef.current?.focus();
+            });
         };
 
         recognitionRef.current = recognition;
@@ -979,6 +988,7 @@ export default function VoiceAssistant() {
                                 </button>
 
                                 <input
+                                    ref={inputRef}
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
                                     onKeyDown={(e) =>

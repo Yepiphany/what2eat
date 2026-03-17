@@ -604,7 +604,7 @@ export default function ProfilePage() {
                                         size={20}
                                         className="mr-2 text-primary-600"
                                     />
-                                    AI 记忆档案
+                                    栗子记忆
                                 </h3>
                             </div>
 
