@@ -80,20 +80,42 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     {navItems.map((item) => {
                         const Icon = item.icon;
                         const isActive = isNavItemActive(item.path);
+                        const isScanItem = item.path === "/scan";
                         return (
                             <Link
                                 key={item.path}
                                 to={item.path}
-                                className={`flex flex-col items-center py-2 px-4 transition-all duration-200 ${
+                                className={`flex h-full flex-col items-center justify-center px-4 transition-all duration-200 ${
+                                    isScanItem ? "-translate-y-0.5" : ""
+                                } ${
                                     isActive
                                         ? "text-primary-600"
                                         : "text-gray-500 hover:text-primary-600"
                                 }`}
                             >
-                                <Icon size={24} />
-                                <span className="text-xs mt-1">
-                                    {item.label}
-                                </span>
+                                <div
+                                    className={`${
+                                        isScanItem
+                                            ? `flex h-14 w-14 shrink-0 aspect-square items-center justify-center rounded-full border-4 border-white shadow-lg ${
+                                                  isActive
+                                                      ? "bg-primary-600 text-white"
+                                                      : "bg-primary-500 text-white hover:bg-primary-600"
+                                              }`
+                                            : ""
+                                    }`}
+                                >
+                                    <Icon size={isScanItem ? 26 : 24} />
+                                </div>
+                                {isScanItem ? (
+                                    <div
+                                        className="mt-1 h-4"
+                                        aria-hidden="true"
+                                    />
+                                ) : (
+                                    <span className="mt-1 text-xs leading-4">
+                                        {item.label}
+                                    </span>
+                                )}
                             </Link>
                         );
                     })}
