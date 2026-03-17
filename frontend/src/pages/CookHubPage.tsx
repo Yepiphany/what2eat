@@ -76,16 +76,16 @@ export default function CookHubPage() {
         currentSession && currentSession.status !== "completed" && currentSession.recipe_id;
 
     const tabs: Array<{ key: CookTab; label: string; count: number }> = [
-        { key: "recommendations", label: "推荐菜谱", count: recommendationCount },
+        { key: "recommendations", label: "推荐", count: recommendationCount },
         { key: "cooking", label: "烹饪", count: hasActiveSession ? 1 : 0 },
-        { key: "history", label: "历史记录", count: historyRecords.length },
+        { key: "history", label: "历史", count: historyRecords.length },
         { key: "favorites", label: "收藏", count: favoriteRecipes.length },
     ];
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <section className="overflow-x-auto">
-                <div className="flex min-w-max gap-4 border-b border-gray-200">
+            <section>
+                <div className="grid grid-cols-4 gap-2 border-b border-gray-200">
                     {tabs.map((tab) => {
                         const isActive = activeTab === tab.key;
                         return (
@@ -95,7 +95,7 @@ export default function CookHubPage() {
                                     setActiveTab(tab.key);
                                     setSearchParams({ tab: tab.key });
                                 }}
-                                className={`-mb-px border-b-2 px-1 pb-3 text-sm md:text-base font-semibold transition-colors ${
+                                className={`-mb-px w-full border-b-2 px-1 pb-3 text-sm md:text-base font-semibold transition-colors ${
                                     isActive
                                         ? "border-primary-500 text-primary-600"
                                         : "border-transparent text-gray-500 hover:text-gray-700"

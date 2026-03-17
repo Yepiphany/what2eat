@@ -75,7 +75,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 {children}
             </main>
 
-            <nav className="fixed bottom-0 left-0 right-0 h-20 bg-white border-t border-gray-200 md:hidden">
+            <nav className="fixed bottom-0 left-0 right-0 z-50 h-20 bg-white border-t border-gray-200">
                 <div className="flex h-full items-center justify-around py-2">
                     {navItems.map((item) => {
                         const Icon = item.icon;
