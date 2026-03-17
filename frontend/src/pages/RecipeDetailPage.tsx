@@ -170,7 +170,7 @@ export default function RecipeDetailPage() {
     return (
       <div className="text-center py-20">
         <h2 className="text-2xl font-bold text-gray-800 mb-4">菜谱不存在</h2>
-        <Link to="/cook/recommendations" className="btn-primary">
+        <Link to="/cook?tab=recommendations" className="btn-primary">
           返回菜谱列表
         </Link>
       </div>

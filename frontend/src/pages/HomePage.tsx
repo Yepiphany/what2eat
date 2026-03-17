@@ -247,7 +247,7 @@ export default function HomePage() {
                                     </p>
                                 </div>
                                 <Link
-                                    to="/cook/recommendations"
+                                    to="/cook?tab=recommendations"
                                     className="px-5 py-3 bg-red-100 text-red-700 hover:bg-red-200 rounded-xl font-medium text-sm transition-colors shadow-sm"
                                 >
                                     浏览菜谱
@@ -426,7 +426,18 @@ export default function HomePage() {
                         <div
                             key={card.id}
                             onClick={() => {
-                                if (!isActive) setActiveIndex(index);
+                                if (isActive) {
+                                    navigate(activeAction.to);
+                                    return;
+                                }
+
+                                if (!isActive) {
+                                    setActiveIndex(index);
+                                    // Simulate tapping the enter button after the card moves to top.
+                                    window.setTimeout(() => {
+                                        navigate(activeAction.to);
+                                    }, 520);
+                                }
                             }}
                             className={`absolute left-0 right-0 rounded-3xl transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] shadow-[0_8px_30px_rgb(0,0,0,0.12)] overflow-hidden cursor-pointer backdrop-blur-xl bg-white/70 ${isActive ? `border-2 ${card.bgBorder}` : "border border-gray-200/70"}`}
                             style={{
@@ -519,7 +530,7 @@ export default function HomePage() {
                                 onClick={() => {
                                     setShowRecipeRefreshDialog(false);
                                     requestRecipeForceRefresh();
-                                    navigate("/cook/recommendations");
+                                    navigate("/cook?tab=recommendations");
                                 }}
                                 className="flex-1 py-3.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-medium shadow-md shadow-primary-200 transition-colors"
                             >

@@ -365,10 +365,10 @@ export default function CookingPage() {
       setSession(updatedSession);
       setGlobalSession(updatedSession);
       setShowCompletionDialog(false);
-      navigate('/cook/recommendations');
+      navigate('/cook?tab=recommendations');
     } catch (error) {
       console.error('Failed to complete cooking:', error);
-      navigate('/cook/recommendations');
+      navigate('/cook?tab=recommendations');
     }
   };
 
@@ -384,7 +384,7 @@ export default function CookingPage() {
     return (
       <div className="text-center py-20">
         <h2 className="text-2xl font-bold text-gray-800 mb-4">无法加载烹饪会话</h2>
-        <Link to="/cook/recommendations" className="btn-primary">
+        <Link to="/cook?tab=recommendations" className="btn-primary">
           返回菜谱
         </Link>
       </div>
@@ -399,7 +399,7 @@ export default function CookingPage() {
     <div className="animate-fade-in">
       <header className="flex items-center justify-between mb-6">
         <button
-          onClick={() => navigate('/cook/recommendations')}
+          onClick={() => navigate('/cook?tab=recommendations')}
           className="flex items-center space-x-2 text-gray-600 hover:text-gray-800"
         >
           <ChevronLeft size={20} />
@@ -641,7 +641,7 @@ export default function CookingPage() {
                       <span>重新烹饪</span>
                     </button>
                     <button
-                      onClick={() => navigate('/cook/recommendations')}
+                      onClick={() => navigate('/cook?tab=recommendations')}
                       className="w-full btn-primary py-3 flex items-center justify-center space-x-2"
                     >
                       <Home size={20} />

@@ -10,7 +10,6 @@ import HomePage from './pages/HomePage';
 import FoodPage from './pages/FoodPage';
 import ScannerPage from './pages/ScannerPage';
 import CookHubPage from './pages/CookHubPage';
-import RecipesPage from './pages/RecipesPage';
 import RecipeDetailPage from './pages/RecipeDetailPage';
 import CookingPage from './pages/CookingPage';
 import ProfilePage from './pages/ProfilePage';
@@ -41,7 +40,7 @@ function App() {
           <Route path="/scan" element={<ScannerPage />} />
 
           <Route path="/cook" element={<CookHubPage />} />
-          <Route path="/cook/recommendations" element={<RecipesPage />} />
+          <Route path="/cook/recommendations" element={<Navigate to="/cook?tab=recommendations" replace />} />
           <Route
             path="/cook/recommendations/:id"
             element={<RecipeDetailPage />}
@@ -52,7 +51,7 @@ function App() {
 
           {/* Legacy path redirects for compatibility while migrating links */}
           <Route path="/scanner" element={<Navigate to="/scan" replace />} />
-          <Route path="/recipes" element={<Navigate to="/cook/recommendations" replace />} />
+          <Route path="/recipes" element={<Navigate to="/cook?tab=recommendations" replace />} />
           <Route path="/recipes/:id" element={<RecipeDetailPage />} />
           <Route path="/shopping" element={<Navigate to="/food/shopping" replace />} />
           <Route path="/cooking/:recipeId" element={<CookingPage />} />

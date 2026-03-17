@@ -334,7 +334,7 @@ export default function FoodPage() {
                     onClick={() => {
                       setShowRecipeRefreshDialog(false);
                       requestRecipeForceRefresh();
-                      navigate('/cook/recommendations');
+                      navigate('/cook?tab=recommendations');
                     }}
                     className="flex-1 px-6 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors"
                 >

@@ -154,7 +154,7 @@ export default function ShoppingPage() {
                             : "已全部完成"}
                     </p>
                     <Link
-                        to="/cook/recommendations"
+                        to="/cook?tab=recommendations"
                         className="inline-flex items-center space-x-2 px-6 py-3 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
                     >
                         <Plus size={20} />

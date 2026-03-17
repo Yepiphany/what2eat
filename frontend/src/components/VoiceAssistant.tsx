@@ -394,7 +394,7 @@ export default function VoiceAssistant() {
             appendMessage("assistant", msg);
             speak(msg);
             if (shouldNavigate) {
-                navigate("/cook/recommendations");
+                navigate("/cook?tab=recommendations");
             }
         } catch (error) {
             console.error("Failed to recommend recipes:", error);
@@ -417,7 +417,7 @@ export default function VoiceAssistant() {
         if (awaitingRecommendation && yesIntent) {
             setAwaitingRecommendation(false);
             setIsPanelOpen(false);
-            navigate("/cook/recommendations");
+            navigate("/cook?tab=recommendations");
             await recommendRecipes(false);
             return;
         }
@@ -610,7 +610,7 @@ export default function VoiceAssistant() {
                                         setAwaitingRecommendation(false);
                                         setActionButton(null);
                                         setIsPanelOpen(false);
-                                        navigate("/cook/recommendations");
+                                        navigate("/cook?tab=recommendations");
                                         void recommendRecipes(false);
                                     }}
                                     className="px-3 py-2 text-sm rounded-lg bg-primary-50 text-primary-700 hover:bg-primary-100"
