@@ -16,6 +16,7 @@ import {
     Plus,
     Trash2,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useUserStore, useIngredientsStore } from "../stores";
 import { memoryApi, userApi } from "../services/api";
 import { getUserId } from "../utils/userId";
@@ -127,10 +128,12 @@ export default function ProfilePage() {
     const [isMemorySaving, setIsMemorySaving] = useState(false);
     const [temporaryGoalInput, setTemporaryGoalInput] = useState("");
     const [longTermGoalInput, setLongTermGoalInput] = useState("");
+    const [showPerceptionModal, setShowPerceptionModal] = useState(false);
 
     const { currentUser, setUser, isAuthenticated, updatePreferences, logout } =
         useUserStore();
     const { ingredients } = useIngredientsStore();
+    const navigate = useNavigate();
 
     useEffect(() => {
         if (currentUser) {
@@ -319,9 +322,40 @@ export default function ProfilePage() {
             memoryProfile?.favorite_recipes.length ?? getFavoriteRecipes().length,
         cookingSessions:
             memoryProfile?.history_records.length ?? getCookingHistory().length,
-        temporaryGoals: memoryProfile?.temporary_goals.length ?? 0,
-        longTermGoals: memoryProfile?.long_term_goals.length ?? 0,
     };
+
+    const temporaryGoals = memoryProfile?.temporary_goals || [];
+    const longTermGoals = memoryProfile?.long_term_goals || [];
+    const selectedDietLabel = selectedDiet
+        ? dietOptions.find((option) => option.value === selectedDiet)?.label
+        : null;
+    const selectedTasteLabels = selectedTastes
+        .map((taste) => tasteOptions.find((option) => option.value === taste)?.label)
+        .filter(Boolean)
+        .join("、");
+    const levelLabelMap: Record<string, string> = {
+        beginner: "初级",
+        intermediate: "中级",
+        advanced: "高级",
+    };
+    const perceptionSummary = [
+        selectedTasteLabels
+            ? `你偏好${selectedTasteLabels}风味`
+            : "你还没有明确口味标签",
+        selectedDietLabel
+            ? `饮食倾向是${selectedDietLabel}`
+            : "饮食类型尚未设置",
+        `常用烹饪时长在${maxCookingTime}分钟内`,
+        temporaryGoals.length > 0
+            ? `近期目标：${temporaryGoals.slice(0, 2).join("、")}`
+            : "近期目标可补充以获得更聚焦建议",
+        longTermGoals.length > 0
+            ? `长期目标：${longTermGoals.slice(0, 2).join("、")}`
+            : "长期目标可补充以优化长期饮食规划",
+        selectedLevel
+            ? `当前烹饪水平${levelLabelMap[selectedLevel] || "未设置"}，建议继续优先推荐成功率高且步骤清晰的菜谱。`
+            : "建议设置烹饪水平，我会更准确控制菜谱复杂度。",
+    ].join("。") + "。";
 
     if (!isAuthenticated || !currentUser) {
         return (
@@ -572,9 +606,6 @@ export default function ProfilePage() {
                                     />
                                     AI 记忆档案
                                 </h3>
-                                <span className="text-xs text-primary-500 tracking-wide">
-                                    Nebula Memory Graph
-                                </span>
                             </div>
 
                             <div className="relative mx-auto w-full max-w-[620px] h-[300px] sm:h-[340px] md:h-[360px]">
@@ -594,16 +625,18 @@ export default function ProfilePage() {
                                     />
                                     <div className="mt-1 sm:mt-2 text-3xl sm:text-3xl md:text-4xl font-bold text-primary-700">
                                         {stats.favoriteRecipes +
-                                            stats.cookingSessions +
-                                            stats.temporaryGoals +
-                                            stats.longTermGoals}
+                                            stats.cookingSessions}
                                     </div>
                                     <p className="text-[10px] sm:text-xs text-primary-700/80 mt-1">
-                                        总记忆节点
+                                        记忆中枢
                                     </p>
                                 </div>
 
-                                <div className="absolute left-[2%] sm:left-[6%] md:left-[8%] top-[18%] w-28 sm:w-32 md:w-36 rounded-2xl border border-primary-200 bg-primary-100/80 backdrop-blur-md p-2.5 sm:p-3 nebula-float shadow-sm">
+                                <button
+                                    onClick={() => navigate("/cook?tab=favorites")}
+                                    className="absolute left-[2%] sm:left-[6%] md:left-[8%] top-[18%] w-28 sm:w-32 md:w-36 rounded-2xl border border-primary-200 bg-primary-100/80 backdrop-blur-md p-2.5 sm:p-3 nebula-float shadow-sm text-left hover:bg-primary-100 transition-colors"
+                                    aria-label="查看收藏"
+                                >
                                     <div className="flex items-center text-primary-700 text-[11px] sm:text-sm">
                                         <BookHeart size={14} className="mr-1 sm:hidden" />
                                         <BookHeart size={16} className="mr-1 hidden sm:block" /> 收藏
@@ -611,11 +644,16 @@ export default function ProfilePage() {
                                     <div className="text-xl sm:text-2xl font-bold text-primary-700 mt-1">
                                         {stats.favoriteRecipes}
                                     </div>
-                                </div>
+                                    <div className="text-[10px] sm:text-xs text-primary-600 mt-0.5">
+                                        点击查看
+                                    </div>
+                                </button>
 
-                                <div
-                                    className="absolute right-[2%] sm:right-[7%] md:right-[9%] top-[20%] w-28 sm:w-32 md:w-36 rounded-2xl border border-accent-200 bg-accent-100/80 backdrop-blur-md p-2.5 sm:p-3 nebula-float shadow-sm"
+                                <button
+                                    onClick={() => navigate("/cook?tab=history")}
+                                    className="absolute right-[2%] sm:right-[7%] md:right-[9%] top-[20%] w-28 sm:w-32 md:w-36 rounded-2xl border border-accent-200 bg-accent-100/80 backdrop-blur-md p-2.5 sm:p-3 nebula-float shadow-sm text-left hover:bg-accent-100 transition-colors"
                                     style={{ animationDelay: "1.2s" }}
+                                    aria-label="查看历史"
                                 >
                                     <div className="flex items-center text-accent-700 text-[11px] sm:text-sm">
                                         <History size={14} className="mr-1 sm:hidden" />
@@ -624,158 +662,35 @@ export default function ProfilePage() {
                                     <div className="text-xl sm:text-2xl font-bold text-accent-700 mt-1">
                                         {stats.cookingSessions}
                                     </div>
-                                </div>
-
-                                <div
-                                    className="absolute left-[4%] sm:left-[11%] md:left-[13%] bottom-[14%] sm:bottom-[15%] w-28 sm:w-32 md:w-36 rounded-2xl border border-primary-200 bg-primary-50/85 backdrop-blur-md p-2.5 sm:p-3 nebula-float shadow-sm"
-                                    style={{ animationDelay: "0.6s" }}
-                                >
-                                    <div className="text-primary-600 text-[11px] sm:text-sm">
-                                        临时目标
+                                    <div className="text-[10px] sm:text-xs text-accent-600 mt-0.5">
+                                        点击查看
                                     </div>
-                                    <div className="text-xl sm:text-2xl font-bold text-primary-700 mt-1">
-                                        {stats.temporaryGoals}
-                                    </div>
-                                </div>
+                                </button>
 
-                                <div
-                                    className="absolute right-[3%] sm:right-[9%] md:right-[11%] bottom-[12%] w-28 sm:w-32 md:w-36 rounded-2xl border border-accent-200 bg-accent-50/85 backdrop-blur-md p-2.5 sm:p-3 nebula-float shadow-sm"
+                                <button
+                                    onClick={() => setShowPerceptionModal(true)}
+                                    className="absolute left-1/2 -translate-x-1/2 bottom-[10%] sm:bottom-[12%] w-32 sm:w-36 md:w-40 rounded-2xl border border-primary-200 bg-white/85 backdrop-blur-md p-2.5 sm:p-3 nebula-float shadow-sm text-left hover:bg-white transition-colors"
                                     style={{ animationDelay: "1.8s" }}
+                                    aria-label="查看 AI 感知"
                                 >
-                                    <div className="text-accent-600 text-[11px] sm:text-sm">
-                                        长期目标
+                                    <div className="flex items-center text-primary-700 text-[11px] sm:text-sm">
+                                        <Target size={14} className="mr-1 sm:hidden" />
+                                        <Target size={16} className="mr-1 hidden sm:block" /> 感知
                                     </div>
-                                    <div className="text-xl sm:text-2xl font-bold text-accent-700 mt-1">
-                                        {stats.longTermGoals}
+                                    <div className="text-base sm:text-lg font-bold text-primary-700 mt-1">
+                                        AI 思考
                                     </div>
-                                </div>
+                                    <div className="text-[10px] sm:text-xs text-primary-600 mt-0.5">
+                                        点击查看
+                                    </div>
+                                </button>
                             </div>
 
-                            <div className="rounded-2xl border border-primary-100 bg-white/80 backdrop-blur-md p-4 space-y-4">
-                                <div className="space-y-2">
-                                    <p className="text-sm font-medium text-gray-700">
-                                        临时目标
-                                    </p>
-                                    <div className="flex gap-2">
-                                        <input
-                                            value={temporaryGoalInput}
-                                            onChange={(e) =>
-                                                setTemporaryGoalInput(
-                                                    e.target.value,
-                                                )
-                                            }
-                                            placeholder="例如：这周少油少盐"
-                                            className="flex-1 h-10 px-3 border border-gray-200 bg-white rounded-lg text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                        />
-                                        <button
-                                            onClick={() =>
-                                                updateGoal(
-                                                    "temporary",
-                                                    temporaryGoalInput,
-                                                    "add",
-                                                )
-                                            }
-                                            disabled={
-                                                isMemorySaving ||
-                                                !temporaryGoalInput.trim()
-                                            }
-                                            className="h-10 px-3 rounded-lg bg-primary-500 text-white disabled:opacity-50"
-                                        >
-                                            <Plus size={16} />
-                                        </button>
-                                    </div>
-                                    <div className="flex flex-wrap gap-2">
-                                        {(memoryProfile?.temporary_goals || []).map(
-                                            (goal) => (
-                                                <span
-                                                    key={`temp-${goal}`}
-                                                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-primary-100 border border-primary-200 text-primary-700 text-sm"
-                                                >
-                                                    {goal}
-                                                    <button
-                                                        onClick={() =>
-                                                            updateGoal(
-                                                                "temporary",
-                                                                goal,
-                                                                "remove",
-                                                            )
-                                                        }
-                                                        className="text-primary-600 hover:text-primary-800"
-                                                        aria-label={`删除目标 ${goal}`}
-                                                    >
-                                                        <Trash2 size={14} />
-                                                    </button>
-                                                </span>
-                                            ),
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <p className="text-sm font-medium text-gray-700">
-                                        长期目标
-                                    </p>
-                                    <div className="flex gap-2">
-                                        <input
-                                            value={longTermGoalInput}
-                                            onChange={(e) =>
-                                                setLongTermGoalInput(
-                                                    e.target.value,
-                                                )
-                                            }
-                                            placeholder="例如：三个月内减脂 5kg"
-                                            className="flex-1 h-10 px-3 border border-gray-200 bg-white rounded-lg text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                        />
-                                        <button
-                                            onClick={() =>
-                                                updateGoal(
-                                                    "long_term",
-                                                    longTermGoalInput,
-                                                    "add",
-                                                )
-                                            }
-                                            disabled={
-                                                isMemorySaving ||
-                                                !longTermGoalInput.trim()
-                                            }
-                                            className="h-10 px-3 rounded-lg bg-primary-500 text-white disabled:opacity-50"
-                                        >
-                                            <Plus size={16} />
-                                        </button>
-                                    </div>
-                                    <div className="flex flex-wrap gap-2">
-                                        {(memoryProfile?.long_term_goals || []).map(
-                                            (goal) => (
-                                                <span
-                                                    key={`long-${goal}`}
-                                                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-accent-100 border border-accent-200 text-accent-700 text-sm"
-                                                >
-                                                    {goal}
-                                                    <button
-                                                        onClick={() =>
-                                                            updateGoal(
-                                                                "long_term",
-                                                                goal,
-                                                                "remove",
-                                                            )
-                                                        }
-                                                        className="text-accent-600 hover:text-accent-800"
-                                                        aria-label={`删除目标 ${goal}`}
-                                                    >
-                                                        <Trash2 size={14} />
-                                                    </button>
-                                                </span>
-                                            ),
-                                        )}
-                                    </div>
-                                </div>
-
-                                {isMemoryLoading && (
-                                    <p className="text-xs text-gray-500">
-                                        正在加载个性化档案...
-                                    </p>
-                                )}
-                            </div>
+                            {isMemoryLoading && (
+                                <p className="text-xs text-gray-500 text-center">
+                                    正在加载个性化档案...
+                                </p>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -819,6 +734,44 @@ export default function ProfilePage() {
                 </button>
             </div>
 
+            {showPerceptionModal && (
+                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl max-w-md w-full border border-primary-100 shadow-xl overflow-hidden">
+                        <div className="p-5 border-b bg-gradient-to-r from-primary-50 to-accent-50 flex items-center justify-between">
+                            <h3 className="text-lg font-semibold text-gray-800 flex items-center">
+                                <Target size={18} className="mr-2 text-primary-600" />
+                                AI 感知
+                            </h3>
+                            <button
+                                onClick={() => setShowPerceptionModal(false)}
+                                className="p-2 hover:bg-white rounded-full"
+                                aria-label="关闭感知弹窗"
+                            >
+                                <X size={18} className="text-gray-500" />
+                            </button>
+                        </div>
+
+                        <div className="p-5 space-y-3">
+                            <p className="text-sm text-gray-600">
+                                基于你的口味偏好、烹饪习惯和目标，我的当前判断是：
+                            </p>
+                            <p className="text-sm leading-6 text-gray-700 bg-gray-50 border border-gray-100 rounded-xl p-3">
+                                {perceptionSummary}
+                            </p>
+                        </div>
+
+                        <div className="p-4 border-t bg-gray-50">
+                            <button
+                                onClick={() => setShowPerceptionModal(false)}
+                                className="w-full btn-primary"
+                            >
+                                我知道了
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {showSettingModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
@@ -826,7 +779,7 @@ export default function ProfilePage() {
                             <div className="flex items-center justify-between">
                                 <h2 className="text-xl font-bold text-gray-800">
                                     {activeSetting === "taste" &&
-                                        "口味偏好设置"}
+                                        "口味偏好与目标设置"}
                                     {activeSetting === "diet" && "饮食类型设置"}
                                     {activeSetting === "time" && "最大烹饪时间"}
                                     {activeSetting === "level" &&
@@ -843,29 +796,151 @@ export default function ProfilePage() {
 
                         <div className="p-6 space-y-6">
                             {activeSetting === "taste" && (
-                                <div>
-                                    <h3 className="font-medium text-gray-800 mb-3">
-                                        选择你喜欢的口味
-                                    </h3>
-                                    <div className="flex flex-wrap gap-2">
-                                        {tasteOptions.map((option) => (
-                                            <button
-                                                key={option.value}
-                                                onClick={() =>
-                                                    toggleTaste(option.value)
-                                                }
-                                                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                                                    selectedTastes.includes(
-                                                        option.value,
-                                                    )
-                                                        ? "bg-primary-500 text-white shadow-md"
-                                                        : `${option.color} hover:opacity-80`
-                                                }`}
-                                            >
-                                                {option.emoji} {option.label}
-                                            </button>
-                                        ))}
+                                <div className="space-y-5">
+                                    <div>
+                                        <h3 className="font-medium text-gray-800 mb-3">
+                                            选择你喜欢的口味
+                                        </h3>
+                                        <div className="flex flex-wrap gap-2">
+                                            {tasteOptions.map((option) => (
+                                                <button
+                                                    key={option.value}
+                                                    onClick={() =>
+                                                        toggleTaste(option.value)
+                                                    }
+                                                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                                                        selectedTastes.includes(
+                                                            option.value,
+                                                        )
+                                                            ? "bg-primary-500 text-white shadow-md"
+                                                            : `${option.color} hover:opacity-80`
+                                                    }`}
+                                                >
+                                                    {option.emoji} {option.label}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
+
+                                    <div className="rounded-xl bg-primary-50/70 border border-primary-100 p-3 space-y-3">
+                                        <p className="text-sm font-medium text-primary-700">
+                                            临时目标
+                                        </p>
+                                        <div className="flex gap-2">
+                                            <input
+                                                value={temporaryGoalInput}
+                                                onChange={(e) =>
+                                                    setTemporaryGoalInput(
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                placeholder="例如：这周少油少盐"
+                                                className="flex-1 h-10 px-3 border border-primary-100 bg-white rounded-lg text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                            />
+                                            <button
+                                                onClick={() =>
+                                                    updateGoal(
+                                                        "temporary",
+                                                        temporaryGoalInput,
+                                                        "add",
+                                                    )
+                                                }
+                                                disabled={
+                                                    isMemorySaving ||
+                                                    !temporaryGoalInput.trim()
+                                                }
+                                                className="h-10 px-3 rounded-lg bg-primary-500 text-white disabled:opacity-50"
+                                            >
+                                                <Plus size={16} />
+                                            </button>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            {temporaryGoals.map((goal) => (
+                                                <span
+                                                    key={`temp-${goal}`}
+                                                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-white border border-primary-200 text-primary-700 text-sm"
+                                                >
+                                                    {goal}
+                                                    <button
+                                                        onClick={() =>
+                                                            updateGoal(
+                                                                "temporary",
+                                                                goal,
+                                                                "remove",
+                                                            )
+                                                        }
+                                                        className="text-primary-600 hover:text-primary-800"
+                                                        aria-label={`删除目标 ${goal}`}
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-xl bg-accent-50/70 border border-accent-100 p-3 space-y-3">
+                                        <p className="text-sm font-medium text-accent-700">
+                                            长期目标
+                                        </p>
+                                        <div className="flex gap-2">
+                                            <input
+                                                value={longTermGoalInput}
+                                                onChange={(e) =>
+                                                    setLongTermGoalInput(
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                placeholder="例如：三个月内减脂 5kg"
+                                                className="flex-1 h-10 px-3 border border-accent-100 bg-white rounded-lg text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                            />
+                                            <button
+                                                onClick={() =>
+                                                    updateGoal(
+                                                        "long_term",
+                                                        longTermGoalInput,
+                                                        "add",
+                                                    )
+                                                }
+                                                disabled={
+                                                    isMemorySaving ||
+                                                    !longTermGoalInput.trim()
+                                                }
+                                                className="h-10 px-3 rounded-lg bg-primary-500 text-white disabled:opacity-50"
+                                            >
+                                                <Plus size={16} />
+                                            </button>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            {longTermGoals.map((goal) => (
+                                                <span
+                                                    key={`long-${goal}`}
+                                                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-white border border-accent-200 text-accent-700 text-sm"
+                                                >
+                                                    {goal}
+                                                    <button
+                                                        onClick={() =>
+                                                            updateGoal(
+                                                                "long_term",
+                                                                goal,
+                                                                "remove",
+                                                            )
+                                                        }
+                                                        className="text-accent-600 hover:text-accent-800"
+                                                        aria-label={`删除目标 ${goal}`}
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {isMemoryLoading && (
+                                        <p className="text-xs text-gray-500">
+                                            正在加载个性化档案...
+                                        </p>
+                                    )}
                                 </div>
                             )}
                             {activeSetting === "diet" && (
