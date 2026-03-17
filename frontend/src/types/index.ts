@@ -116,7 +116,6 @@ export interface RecipeRecommendationRequest {
   available_ingredients: string[];
   required_ingredients?: string[];
   preset_ingredients?: string[];
-  user_id?: string;
   taste_preferences?: TastePreference[];
   diet_type?: DietType;
   max_cooking_time?: number;

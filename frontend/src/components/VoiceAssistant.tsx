@@ -491,7 +491,6 @@ export default function VoiceAssistant() {
                 user_id: getUserId(),
                 available_ingredients: names,
                 required_ingredients: desiredIngredients,
-                user_id: getUserId(),
                 taste_preferences:
                     preferences.tastePreferences as TastePreference[],
                 diet_type: (preferences.dietType || undefined) as
@@ -830,7 +829,6 @@ export default function VoiceAssistant() {
     };
 
     const startListening = () => {
-        setIsPanelOpen(true);
         if (!supportSpeech) return;
         const Recognition =
             (window as any).SpeechRecognition ||
@@ -847,13 +845,13 @@ export default function VoiceAssistant() {
         recognition.onresult = (event: any) => {
             const transcript = (event.results?.[0]?.[0]?.transcript || "").trim();
             if (!transcript) return;
-            setInput((prev) => {
-                if (!prev.trim()) return transcript;
-                return `${prev.trim()} ${transcript}`;
-            });
-            requestAnimationFrame(() => {
-                inputRef.current?.focus();
-            });
+            // Fill top input first, then open panel and auto-send.
+            setInput(transcript);
+            window.setTimeout(() => {
+                setIsPanelOpen(true);
+                setInput("");
+                void handleCommand(transcript);
+            }, 500);
         };
 
         recognitionRef.current = recognition;
@@ -879,19 +877,28 @@ export default function VoiceAssistant() {
         >
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 relative">
                 <div className="relative">
-                    <button
-                        type="button"
-                        onClick={() => setIsPanelOpen(true)}
-                        className={`w-full h-12 pl-4 pr-14 border rounded-full text-sm text-left hover:bg-gray-50 bg-white shadow-sm flex items-center overflow-hidden transition-colors duration-200 ${
+                    <input
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        onFocus={() => setIsPanelOpen(true)}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                                setIsPanelOpen(true);
+                                void submitText();
+                            }
+                        }}
+                        disabled={isListening}
+                        placeholder={
                             isListening
-                                ? "border-green-500 ring-2 ring-green-100 text-green-700"
-                                : "border-gray-200 text-gray-500"
-                        }`}
-                    >
-                        {isListening
-                            ? "正在语音识别..."
-                            : "点击进入悬浮聊天，支持语音与文字"}
-                    </button>
+                                ? "正在语音识别..."
+                                : "点击输入或语音识别，支持自动发送"
+                        }
+                        className={`w-full h-12 pl-4 pr-14 border rounded-full text-sm bg-white shadow-sm transition-colors duration-200 focus:outline-none focus:ring-2 ${
+                            isListening
+                                ? "border-green-500 ring-green-100 text-green-700"
+                                : "border-gray-200 text-gray-700 focus:ring-primary-500"
+                        } disabled:bg-gray-50 disabled:text-gray-500`}
+                    />
                     <button
                         onClick={isListening ? stopListening : startListening}
                         disabled={!supportSpeech}
