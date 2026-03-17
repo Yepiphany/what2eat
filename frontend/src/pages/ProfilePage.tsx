@@ -306,14 +306,10 @@ export default function ProfilePage() {
         window.location.href = "/";
     };
 
-    const expiryLevelStats = ingredients.reduce(
-        (acc, item) => {
-            const status = getExpiryStatus(item);
-            acc[status.level] += 1;
-            return acc;
-        },
-        { red: 0, yellow: 0, green: 0 },
-    );
+    const urgentIngredientsCount = ingredients.reduce((count, item) => {
+        const status = getExpiryStatus(item);
+        return status.level === "red" ? count + 1 : count;
+    }, 0);
 
     const stats = {
         totalIngredients: scannedIngredientsCount,
@@ -579,13 +575,11 @@ export default function ProfilePage() {
                         </div>
 
                         <div className="text-center p-4 bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl">
-                            <div className="text-sm font-semibold text-orange-700 space-y-1">
-                                <div>立即吃 {expiryLevelStats.red}</div>
-                                <div>尽快吃 {expiryLevelStats.yellow}</div>
-                                <div>很新鲜 {expiryLevelStats.green}</div>
+                            <div className="text-3xl font-bold text-orange-600">
+                                {urgentIngredientsCount}
                             </div>
                             <div className="text-sm text-gray-600">
-                                保质期标签
+                                临期食材
                             </div>
                         </div>
                     </div>

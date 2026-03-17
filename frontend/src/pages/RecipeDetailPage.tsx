@@ -79,7 +79,24 @@ export default function RecipeDetailPage() {
   const [isInShoppingList, setIsInShoppingList] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [shoppingListFeedback, setShoppingListFeedback] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
   const hasViewedRef = useRef(false);
+  const feedbackTimerRef = useRef<number | null>(null);
+
+  const showShoppingListFeedback = (type: 'success' | 'error', message: string) => {
+    setShoppingListFeedback({ type, message });
+
+    if (feedbackTimerRef.current) {
+      window.clearTimeout(feedbackTimerRef.current);
+    }
+
+    feedbackTimerRef.current = window.setTimeout(() => {
+      setShoppingListFeedback(null);
+    }, 2600);
+  };
   
   useEffect(() => {
     if (id && !hasViewedRef.current) {
@@ -107,6 +124,14 @@ export default function RecipeDetailPage() {
       checkShoppingList();
     }
   }, [recipe, id]);
+
+  useEffect(() => {
+    return () => {
+      if (feedbackTimerRef.current) {
+        window.clearTimeout(feedbackTimerRef.current);
+      }
+    };
+  }, []);
 
   const checkShoppingList = async () => {
     try {
@@ -149,10 +174,10 @@ export default function RecipeDetailPage() {
         recipe_title: recipe.title
       });
       setIsInShoppingList(true);
-      alert('已添加到采购清单');
+      showShoppingListFeedback('success', '已添加到采购清单');
     } catch (error) {
       console.error('Failed to add to shopping list:', error);
-      alert('添加失败，请重试');
+      showShoppingListFeedback('error', '添加失败，请重试');
     } finally {
       setIsAdding(false);
     }
@@ -272,22 +297,35 @@ export default function RecipeDetailPage() {
               <h2 className="text-lg md:text-xl font-bold text-gray-800">所需食材</h2>
               
               {recipe.missing_ingredients && recipe.missing_ingredients.length > 0 && (
-                <button
-                  onClick={handleAddToShoppingList}
-                  disabled={isAdding || !recipe.missing_ingredients || recipe.missing_ingredients.length === 0 || isInShoppingList}
-                  className={`flex items-center justify-center space-x-2 px-4 py-2 rounded-lg transition-colors text-sm md:text-base ${
-                    isInShoppingList
-                      ? 'bg-accent-500 text-white'
-                      : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-                  } ${(isAdding || !recipe.missing_ingredients || recipe.missing_ingredients.length === 0) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {isAdding ? (
-                    <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <ShoppingCart size={18} />
+                <div className="w-full md:w-auto">
+                  <button
+                    onClick={handleAddToShoppingList}
+                    disabled={isAdding || !recipe.missing_ingredients || recipe.missing_ingredients.length === 0 || isInShoppingList}
+                    className={`flex w-full md:w-auto items-center justify-center space-x-2 px-4 py-2 rounded-lg transition-colors text-sm md:text-base ${
+                      isInShoppingList
+                        ? 'bg-accent-500 text-white'
+                        : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                    } ${(isAdding || !recipe.missing_ingredients || recipe.missing_ingredients.length === 0) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {isAdding ? (
+                      <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <ShoppingCart size={18} />
+                    )}
+                    <span>{isInShoppingList ? '已添加' : '添加至采购清单'}</span>
+                  </button>
+                  {shoppingListFeedback && (
+                    <p
+                      role="status"
+                      aria-live="polite"
+                      className={`mt-2 text-sm ${
+                        shoppingListFeedback.type === 'success' ? 'text-accent-700' : 'text-red-600'
+                      }`}
+                    >
+                      {shoppingListFeedback.message}
+                    </p>
                   )}
-                  <span>{isInShoppingList ? '已添加' : '添加至采购清单'}</span>
-                </button>
+                </div>
               )}
             </div>
 
