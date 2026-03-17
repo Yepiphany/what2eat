@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronLeft, Heart, Plus, Trash2 } from "lucide-react";
+import { ChevronLeft, Clock3, Heart, Plus, Trash2 } from "lucide-react";
 
 import { useIngredientsStore } from "../stores";
 import { requestRecipeForceRefresh } from "../services/recipeCache";
@@ -9,15 +9,21 @@ export default function DesiredIngredientsPage() {
     const navigate = useNavigate();
     const {
         desiredIngredients,
+        desiredIngredientHistory,
         addDesiredIngredient,
         removeDesiredIngredient,
         setDesiredIngredients,
+        syncDesiredIngredientStatus,
     } = useIngredientsStore();
 
     const [inputValue, setInputValue] = useState("");
     const [showClearDialog, setShowClearDialog] = useState(false);
     const [showRecipeRefreshDialog, setShowRecipeRefreshDialog] =
         useState(false);
+
+    useEffect(() => {
+        syncDesiredIngredientStatus();
+    }, [syncDesiredIngredientStatus]);
 
     const handleAdd = () => {
         const value = inputValue.trim();
@@ -60,16 +66,13 @@ export default function DesiredIngredientsPage() {
                     </div>
                     <div>
                         <h2 className="font-semibold text-gray-800 text-lg">
-                            我的心想食材
+                            添加心想食材
                         </h2>
                     </div>
                 </div>
 
                 <div className="flex flex-col md:flex-row md:items-end gap-3">
                     <div className="flex-1">
-                        <label className="block text-sm text-gray-600 mb-1">
-                            添加心想食材
-                        </label>
                         <input
                             type="text"
                             value={inputValue}
@@ -94,6 +97,24 @@ export default function DesiredIngredientsPage() {
                         <span>添加</span>
                     </button>
                 </div>
+
+                <Link
+                    to="/food/desired/history"
+                    className="mt-4 block rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 hover:bg-amber-100 transition-colors"
+                >
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-amber-700">
+                            <Clock3 size={18} />
+                            <span className="font-medium">过往心想</span>
+                        </div>
+                        <span className="text-sm text-amber-700">
+                            {desiredIngredientHistory.length} 条
+                        </span>
+                    </div>
+                    <p className="mt-1 text-sm text-amber-700/80">
+                        查看曾经的心想食材
+                    </p>
+                </Link>
             </section>
 
             {desiredIngredients.length === 0 ? (

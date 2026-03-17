@@ -15,6 +15,7 @@ import CookingPage from './pages/CookingPage';
 import ProfilePage from './pages/ProfilePage';
 import ShoppingPage from './pages/ShoppingPage';
 import DesiredIngredientsPage from './pages/DesiredIngredientsPage';
+import DesiredIngredientsHistoryPage from './pages/DesiredIngredientsHistoryPage';
 import Layout from './components/Layout';
 
 function ScrollToTop() {
@@ -38,6 +39,7 @@ function App() {
           <Route path="/food/inventory" element={<FoodPage />} />
           <Route path="/food/shopping" element={<ShoppingPage />} />
           <Route path="/food/desired" element={<DesiredIngredientsPage />} />
+          <Route path="/food/desired/history" element={<DesiredIngredientsHistoryPage />} />
 
           <Route path="/scan" element={<ScannerPage />} />
 

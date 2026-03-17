@@ -3,9 +3,91 @@ import { persist } from 'zustand/middleware';
 import type { Ingredient, Recipe, CookingSession, User } from '../types';
 import { getUserId } from '../utils/userId';
 
+interface DesiredIngredientEntry {
+  name: string;
+  createdDate: string;
+}
+
+const getLocalDateKey = (date: Date = new Date()): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const normalizeDesiredIngredientNames = (ingredients: string[]): string[] => {
+  const names: string[] = [];
+  const seen = new Set<string>();
+
+  ingredients.forEach((item) => {
+    const normalized = item.trim();
+    if (!normalized) {
+      return;
+    }
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    names.push(normalized);
+  });
+
+  return names;
+};
+
+const normalizeDesiredEntries = (
+  entries: DesiredIngredientEntry[],
+): DesiredIngredientEntry[] => {
+  const today = getLocalDateKey();
+  const seen = new Set<string>();
+  const normalized: DesiredIngredientEntry[] = [];
+
+  entries.forEach((entry) => {
+    const name = entry.name.trim();
+    if (!name) {
+      return;
+    }
+
+    const key = name.toLowerCase();
+    if (seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    normalized.push({
+      name,
+      createdDate: /^\d{4}-\d{2}-\d{2}$/.test(entry.createdDate)
+        ? entry.createdDate
+        : today,
+    });
+  });
+
+  return normalized;
+};
+
+const buildDesiredIngredientState = (entries: DesiredIngredientEntry[]) => {
+  const today = getLocalDateKey();
+  const normalizedEntries = normalizeDesiredEntries(entries);
+
+  const desiredIngredients = normalizedEntries
+    .filter((entry) => entry.createdDate >= today)
+    .map((entry) => entry.name);
+  const desiredIngredientHistory = normalizedEntries
+    .filter((entry) => entry.createdDate < today)
+    .map((entry) => entry.name);
+
+  return {
+    desiredIngredientEntries: normalizedEntries,
+    desiredIngredients,
+    desiredIngredientHistory,
+  };
+};
+
 interface IngredientsStore {
   ingredients: Ingredient[];
   desiredIngredients: string[];
+  desiredIngredientEntries: DesiredIngredientEntry[];
+  desiredIngredientHistory: string[];
   isLoading: boolean;
   error: string | null;
   
@@ -18,6 +100,7 @@ interface IngredientsStore {
   updateIngredient: (id: string, data: Partial<Ingredient>) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
+  syncDesiredIngredientStatus: () => void;
   clearIngredients: () => Promise<void>;
 }
 
@@ -26,20 +109,20 @@ export const useIngredientsStore = create<IngredientsStore>()(
     (set) => ({
       ingredients: [],
       desiredIngredients: [],
+      desiredIngredientEntries: [],
+      desiredIngredientHistory: [],
       isLoading: false,
       error: null,
       
       setIngredients: (ingredients) => set({ ingredients }),
 
       setDesiredIngredients: (ingredients) =>
-        set({
-          desiredIngredients: Array.from(
-            new Set(
-              ingredients
-                .map((item) => item.trim())
-                .filter((item) => item.length > 0),
-            ),
-          ),
+        set(() => {
+          const entries = normalizeDesiredIngredientNames(ingredients).map((name) => ({
+            name,
+            createdDate: getLocalDateKey(),
+          }));
+          return buildDesiredIngredientState(entries);
         }),
 
       addDesiredIngredient: (ingredient) =>
@@ -49,24 +132,33 @@ export const useIngredientsStore = create<IngredientsStore>()(
             return state;
           }
 
-          const exists = state.desiredIngredients.some(
-            (item) => item.toLowerCase() === normalized.toLowerCase(),
+          const existsInTodayList = state.desiredIngredientEntries.some(
+            (entry) =>
+              entry.name.toLowerCase() === normalized.toLowerCase() &&
+              entry.createdDate >= getLocalDateKey(),
           );
-          if (exists) {
+          if (existsInTodayList) {
             return state;
           }
 
-          return {
-            desiredIngredients: [...state.desiredIngredients, normalized],
-          };
+          const filteredEntries = state.desiredIngredientEntries.filter(
+            (entry) => entry.name.toLowerCase() !== normalized.toLowerCase(),
+          );
+
+          return buildDesiredIngredientState([
+            ...filteredEntries,
+            { name: normalized, createdDate: getLocalDateKey() },
+          ]);
         }),
 
       removeDesiredIngredient: (ingredient) =>
-        set((state) => ({
-          desiredIngredients: state.desiredIngredients.filter(
-            (item) => item.toLowerCase() !== ingredient.toLowerCase(),
+        set((state) =>
+          buildDesiredIngredientState(
+            state.desiredIngredientEntries.filter(
+              (entry) => entry.name.toLowerCase() !== ingredient.toLowerCase(),
+            ),
           ),
-        })),
+        ),
       
       addIngredient: (ingredient) =>
         set((state) => ({
@@ -88,9 +180,17 @@ export const useIngredientsStore = create<IngredientsStore>()(
       setLoading: (loading) => set({ isLoading: loading }),
       
       setError: (error) => set({ error }),
+
+      syncDesiredIngredientStatus: () =>
+        set((state) => buildDesiredIngredientState(state.desiredIngredientEntries)),
       
       clearIngredients: async () => {
-        set({ ingredients: [], desiredIngredients: [] });
+        set({
+          ingredients: [],
+          desiredIngredients: [],
+          desiredIngredientEntries: [],
+          desiredIngredientHistory: [],
+        });
         try {
           const { ingredientApi } = await import('../services/api');
           await ingredientApi.clearAllIngredients(getUserId());
@@ -101,6 +201,28 @@ export const useIngredientsStore = create<IngredientsStore>()(
     }),
     {
       name: 'ingredients-storage',
+      merge: (persistedState, currentState) => {
+        const persisted = (persistedState ?? {}) as Partial<IngredientsStore> & {
+          desiredIngredientEntries?: DesiredIngredientEntry[];
+          desiredIngredients?: string[];
+        };
+
+        const fallbackEntries = normalizeDesiredIngredientNames(
+          persisted.desiredIngredients ?? [],
+        ).map((name) => ({ name, createdDate: getLocalDateKey() }));
+
+        const desiredState = buildDesiredIngredientState(
+          Array.isArray(persisted.desiredIngredientEntries)
+            ? persisted.desiredIngredientEntries
+            : fallbackEntries,
+        );
+
+        return {
+          ...currentState,
+          ...persisted,
+          ...desiredState,
+        };
+      },
     }
   )
 );

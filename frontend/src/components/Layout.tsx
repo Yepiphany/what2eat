@@ -1,6 +1,8 @@
+import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Home, Scan, User, Carrot, ChefHat } from "lucide-react";
 import VoiceAssistant from "./VoiceAssistant";
+import { useIngredientsStore } from "../stores";
 
 const navItems = [
     { path: "/home", icon: Home, label: "首页" },
@@ -12,6 +14,13 @@ const navItems = [
 
 export default function Layout({ children }: { children: React.ReactNode }) {
     const location = useLocation();
+    const syncDesiredIngredientStatus = useIngredientsStore(
+        (state) => state.syncDesiredIngredientStatus,
+    );
+
+    useEffect(() => {
+        syncDesiredIngredientStatus();
+    }, [location.pathname, syncDesiredIngredientStatus]);
 
     const getActiveView = () => {
         const path = location.pathname;
