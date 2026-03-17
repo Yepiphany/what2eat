@@ -87,6 +87,7 @@ export interface User {
 
 export interface RecipeRecommendationRequest {
   available_ingredients: string[];
+  required_ingredients?: string[];
   preset_ingredients?: string[];
   taste_preferences?: TastePreference[];
   diet_type?: DietType;

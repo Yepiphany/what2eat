@@ -5,10 +5,14 @@ import { getUserId } from '../utils/userId';
 
 interface IngredientsStore {
   ingredients: Ingredient[];
+  desiredIngredients: string[];
   isLoading: boolean;
   error: string | null;
   
   setIngredients: (ingredients: Ingredient[]) => void;
+  setDesiredIngredients: (ingredients: string[]) => void;
+  addDesiredIngredient: (ingredient: string) => void;
+  removeDesiredIngredient: (ingredient: string) => void;
   addIngredient: (ingredient: Ingredient) => void;
   removeIngredient: (id: string) => void;
   updateIngredient: (id: string, data: Partial<Ingredient>) => void;
@@ -21,10 +25,48 @@ export const useIngredientsStore = create<IngredientsStore>()(
   persist(
     (set) => ({
       ingredients: [],
+      desiredIngredients: [],
       isLoading: false,
       error: null,
       
       setIngredients: (ingredients) => set({ ingredients }),
+
+      setDesiredIngredients: (ingredients) =>
+        set({
+          desiredIngredients: Array.from(
+            new Set(
+              ingredients
+                .map((item) => item.trim())
+                .filter((item) => item.length > 0),
+            ),
+          ),
+        }),
+
+      addDesiredIngredient: (ingredient) =>
+        set((state) => {
+          const normalized = ingredient.trim();
+          if (!normalized) {
+            return state;
+          }
+
+          const exists = state.desiredIngredients.some(
+            (item) => item.toLowerCase() === normalized.toLowerCase(),
+          );
+          if (exists) {
+            return state;
+          }
+
+          return {
+            desiredIngredients: [...state.desiredIngredients, normalized],
+          };
+        }),
+
+      removeDesiredIngredient: (ingredient) =>
+        set((state) => ({
+          desiredIngredients: state.desiredIngredients.filter(
+            (item) => item.toLowerCase() !== ingredient.toLowerCase(),
+          ),
+        })),
       
       addIngredient: (ingredient) =>
         set((state) => ({
@@ -48,7 +90,7 @@ export const useIngredientsStore = create<IngredientsStore>()(
       setError: (error) => set({ error }),
       
       clearIngredients: async () => {
-        set({ ingredients: [] });
+        set({ ingredients: [], desiredIngredients: [] });
         try {
           const { ingredientApi } = await import('../services/api');
           await ingredientApi.clearAllIngredients(getUserId());

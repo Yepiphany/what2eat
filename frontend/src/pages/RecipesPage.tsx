@@ -25,16 +25,31 @@ export default function RecipesPage() {
   const [isFirstTimeLoading, setIsFirstTimeLoading] = useState(true);
   // isInitialLoadRef removed as it was unused
 
-  const { ingredients } = useIngredientsStore();
+  const { ingredients, desiredIngredients } = useIngredientsStore();
   const { recipePages, currentPage, setRecipePages, addRecipePage, setCurrentPage, recommendations, setRecommendations, loadFromDatabase, clearRecommendations, getRecipePagesLength } = useRecipesStore();
   const { preferences } = useUserStore();
 
   const availableIngredientNames = useMemo(() =>
     ingredients.map(ing => ing.name)
   , [ingredients]);
+  const requiredIngredientNames = useMemo(
+    () => desiredIngredients.map((item) => item.trim()).filter((item) => item.length > 0),
+    [desiredIngredients],
+  );
+  const recommendationContextKey = useMemo(
+    () => JSON.stringify({ availableIngredientNames, requiredIngredientNames }),
+    [availableIngredientNames, requiredIngredientNames],
+  );
+  const cacheContextIngredients = useMemo(
+    () => [
+      ...availableIngredientNames,
+      ...requiredIngredientNames.map((item) => `required:${item}`),
+    ],
+    [availableIngredientNames, requiredIngredientNames],
+  );
   const [excludedIngredients, setExcludedIngredients] = useState<string[]>([]);
   const hasLoadedRef = useRef(false); // 防止重复加载
-  const lastIngredientsRef = useRef<string[]>([]); // 记录上次加载的食材
+  const lastContextKeyRef = useRef<string>(''); // 记录上次加载的推荐上下文
   const isFetchingRef = useRef(false); // 防止并发调用 fetchRecipes
 
   // 定义 fetchRecipes 函数，使用 useCallback 缓存
@@ -56,6 +71,7 @@ export default function RecipesPage() {
       
       const request = {
         available_ingredients: filteredIngredients,
+        required_ingredients: requiredIngredientNames,
         force_refresh: forceRefresh,
         taste_preferences: preferences.tastePreferences as TastePreference[],
         diet_type: preferences.dietType as DietType,
@@ -76,7 +92,7 @@ export default function RecipesPage() {
       
       if (forceRefresh) {
         console.log('[DEBUG] 强制刷新，添加新页面');
-        addRecipePage(recipes, availableIngredientNames);
+        addRecipePage(recipes, cacheContextIngredients);
       } else {
         console.log('[DEBUG] 非强制刷新，检查当前页面数');
         // 使用 getRecipePagesLength 获取最新状态
@@ -87,7 +103,7 @@ export default function RecipesPage() {
           setRecommendations(recipes);
           setCurrentPage(0);
           // 只调用 addRecipePage，它会同时更新状态和保存到数据库
-          addRecipePage(recipes, availableIngredientNames);
+          addRecipePage(recipes, cacheContextIngredients);
         } else {
           console.log('[DEBUG] 已有页面，跳过设置新菜谱');
         }
@@ -104,7 +120,7 @@ export default function RecipesPage() {
       setIsLoading(false);
       isFetchingRef.current = false;
     }
-  }, [availableIngredientNames, preferences.tastePreferences, preferences.dietType, preferences.maxCookingTime, preferences.cookingLevel, setRecommendations, addRecipePage, setCurrentPage, setRecipePages, getRecipePagesLength]);
+  }, [availableIngredientNames, requiredIngredientNames, preferences.tastePreferences, preferences.dietType, preferences.maxCookingTime, preferences.cookingLevel, setRecommendations, addRecipePage, setCurrentPage, setRecipePages, getRecipePagesLength, cacheContextIngredients]);
 
   // 加载数据库数据 - 只在组件挂载和食材变化时执行
   useEffect(() => {
@@ -117,8 +133,8 @@ export default function RecipesPage() {
       const loadData = async () => {
         console.log('[DEBUG] 强制刷新 - 先加载数据库数据');
         hasLoadedRef.current = true;
-        lastIngredientsRef.current = [...availableIngredientNames];
-        const loadedPageCount = await loadFromDatabase(availableIngredientNames);
+        lastContextKeyRef.current = recommendationContextKey;
+        const loadedPageCount = await loadFromDatabase(cacheContextIngredients);
         console.log('[DEBUG] 数据库加载完成，加载了', loadedPageCount, '页');
         // 然后获取新菜谱
         fetchRecipes([], true);
@@ -128,10 +144,10 @@ export default function RecipesPage() {
     }
     
     // 检查食材是否发生变化
-    const ingredientsChanged = JSON.stringify(lastIngredientsRef.current) !== JSON.stringify(availableIngredientNames);
+    const contextChanged = lastContextKeyRef.current !== recommendationContextKey;
     
     // 防止重复加载（React 严格模式会导致组件渲染两次）
-    if (hasLoadedRef.current && !ingredientsChanged) {
+    if (hasLoadedRef.current && !contextChanged) {
       console.log('[DEBUG] 已经加载过且食材未变，跳过');
       return;
     }
@@ -143,7 +159,7 @@ export default function RecipesPage() {
     }
     
     // 如果已经初始化过且食材未变，跳过
-    if (hasInitialLoad && !ingredientsChanged) {
+    if (hasInitialLoad && !contextChanged) {
       console.log('[DEBUG] 已经初始化过且食材未变，跳过加载');
       return;
     }
@@ -154,11 +170,11 @@ export default function RecipesPage() {
     }
     
     const loadData = async () => {
-      console.log('[DEBUG] 开始加载数据库, ingredientsChanged=', ingredientsChanged);
+      console.log('[DEBUG] 开始加载数据库, contextChanged=', contextChanged);
       hasLoadedRef.current = true; // 标记已加载
-      lastIngredientsRef.current = [...availableIngredientNames]; // 记录当前食材
+      lastContextKeyRef.current = recommendationContextKey; // 记录当前推荐上下文
       setIsLoadingFromDb(true);
-      const loadedPageCount = await loadFromDatabase(availableIngredientNames);
+      const loadedPageCount = await loadFromDatabase(cacheContextIngredients);
       console.log('[DEBUG] 数据库加载完成，加载了', loadedPageCount, '页, 类型:', typeof loadedPageCount);
       setHasInitialLoad(true);
       setIsLoadingFromDb(false);
@@ -177,7 +193,7 @@ export default function RecipesPage() {
   // 依赖 availableIngredientNames 数组本身，而不仅仅是长度
   // 但使用 hasLoadedRef 和 hasInitialLoad 来防止重复加载
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [availableIngredientNames]);
+  }, [availableIngredientNames, recommendationContextKey, cacheContextIngredients]);
 
   const displayRecipes = useMemo(() => {
     if (recipePages.length > 0 && recipePages[currentPage]) {

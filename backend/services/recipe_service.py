@@ -73,6 +73,57 @@ def _contains_any_keyword(text: str, keywords: List[str]) -> bool:
     return any(_normalize_text(keyword) in normalized for keyword in keywords)
 
 
+def _contains_ingredient(ingredient_name: str, recipe_ingredients: List[str]) -> bool:
+    target = _normalize_text(ingredient_name)
+    if not target:
+        return False
+
+    for ingredient in recipe_ingredients:
+        normalized = _normalize_text(str(ingredient))
+        if not normalized:
+            continue
+        if target == normalized or target in normalized or normalized in target:
+            return True
+    return False
+
+
+def _satisfies_required_ingredients(recipe: Dict, required_ingredients: List[str]) -> bool:
+    if not required_ingredients:
+        return True
+
+    recipe_ingredients = recipe.get("ingredients", []) or []
+    return any(
+        _contains_ingredient(required, recipe_ingredients)
+        for required in required_ingredients
+    )
+
+
+def filter_recipes_by_required_ingredients(recipes: List[Dict], required_ingredients: List[str]) -> List[Dict]:
+    if not required_ingredients:
+        return recipes
+    return [recipe for recipe in recipes if _satisfies_required_ingredients(recipe, required_ingredients)]
+
+
+def prioritize_recipes_by_required_ingredients(recipes: List[Dict], required_ingredients: List[str]) -> List[Dict]:
+    if not required_ingredients:
+        return recipes
+
+    def required_match_count(recipe: Dict) -> int:
+        recipe_ingredients = recipe.get("ingredients", []) or []
+        return sum(
+            1 for required in required_ingredients if _contains_ingredient(required, recipe_ingredients)
+        )
+
+    return sorted(
+        recipes,
+        key=lambda recipe: (
+            required_match_count(recipe) > 0,
+            required_match_count(recipe),
+        ),
+        reverse=True,
+    )
+
+
 def _is_signature_seasoning(ingredient: str, recipe_title: str) -> bool:
     if _contains_any_keyword(ingredient, SIGNATURE_SEASONING_KEYWORDS):
         return True
@@ -298,6 +349,7 @@ def get_recipe_from_database(recipe_id: str) -> Optional[Dict]:
 async def get_ai_batch_recipes(
     available_ingredients: List[str],
     matching_ingredients: Optional[List[str]] = None,
+    required_ingredients: Optional[List[str]] = None,
     taste_preferences: Optional[List[TastePreference]] = None,
     diet_type: Optional[DietType] = None,
     count: int = 3,
@@ -309,6 +361,9 @@ async def get_ai_batch_recipes(
         return []
 
     effective_matching_ingredients = matching_ingredients or available_ingredients
+    effective_required_ingredients = [
+        item.strip() for item in (required_ingredients or []) if str(item).strip()
+    ]
     
     ingredients_hash = generate_ingredients_hash(available_ingredients, taste_preferences, diet_type)
     
@@ -335,6 +390,7 @@ async def get_ai_batch_recipes(
         }
         diet_str = diet_descriptions.get(diet_type.value if diet_type else "balanced", "均衡饮食")
         ingredients_str = ", ".join(available_ingredients)
+        required_ingredients_str = ", ".join(effective_required_ingredients)
         
         # 烹饪水平描述
         level_descriptions = {
@@ -386,6 +442,7 @@ async def get_ai_batch_recipes(
 饮食偏好: {diet_str}
 烹饪水平: {level_str}
 最大烹饪时间: {time_str}
+心想食材(重点优先): {required_ingredients_str if required_ingredients_str else "无"}
 
 {category_instruction}
 
@@ -397,6 +454,7 @@ async def get_ai_batch_recipes(
 5. taste_tags 必须使用中文，可选值：辣、甜、酸、咸、鲜、清淡、苦
 6. missing_ingredients 中忽略常见调味品（如盐、糖、生抽、料酒、葱姜蒜等）和水；仅在缺少菜品特色调味品时提示（如豆瓣酱、咖喱、孜然、沙茶酱等）
 7. 5道菜整体设计时，现有食材要尽量分散使用：每种“现有食材”最多只在1道菜中作为可命中食材出现，避免同一现有食材在多道菜重复占用
+8. 如果存在“心想食材”，这是本次推荐的特别强调项：请优先围绕这些食材设计菜品，推荐的若干菜谱中必须包含有使用这些食材的菜品，并在菜名、描述或配料中清晰体现；同时保持菜谱多样性，不要只返回这一类菜品
 
 严格按照JSON数组格式返回：
 
@@ -545,6 +603,7 @@ async def get_ai_batch_recipes(
             print(f"JSON decode error: {e}, content: {content}")
         
         if all_recipes:
+            all_recipes = prioritize_recipes_by_required_ingredients(all_recipes, effective_required_ingredients)
             all_recipes = enforce_unique_ingredient_usage(all_recipes, effective_matching_ingredients)
             all_recipes = prioritize_recipes_by_match(all_recipes)
             save_recipes_to_cache(ingredients_hash, available_ingredients, all_recipes, taste_preferences, diet_type)

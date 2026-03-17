@@ -54,6 +54,7 @@ async def get_recipe_recommendations(request: Request):
     
     data = await request.json()
     available_ingredients = data.get('available_ingredients', [])
+    required_ingredients = data.get('required_ingredients', [])
     preset_ingredients = data.get('preset_ingredients', [])
     taste_preferences = data.get('taste_preferences', [])
     diet_type_str = data.get('diet_type', None)
@@ -88,6 +89,7 @@ async def get_recipe_recommendations(request: Request):
     recipes = await get_ai_batch_recipes(
         available_ingredients=prepared_ingredients,
         matching_ingredients=available_ingredients,
+        required_ingredients=required_ingredients,
         taste_preferences=taste_prefs,
         diet_type=diet_type,
         count=10,

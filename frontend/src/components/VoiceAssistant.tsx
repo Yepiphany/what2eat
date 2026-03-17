@@ -269,10 +269,105 @@ const extractDishName = (text: string): string => {
     return "";
 };
 
+const desiredIngredientStopWords = new Set([
+    "我",
+    "想",
+    "吃",
+    "想吃",
+    "要",
+    "想要",
+    "帮我",
+    "请",
+    "把",
+    "给我",
+    "一下",
+    "心想",
+    "心选",
+    "食材",
+    "心想食材",
+    "心选食材",
+    "添加",
+    "加入",
+    "设置",
+    "标记",
+    "删除",
+    "移除",
+    "去掉",
+    "清空",
+    "查看",
+    "打开",
+    "进入",
+    "我的",
+    "今天",
+    "今晚",
+    "明天",
+    "中午",
+    "早上",
+    "下午",
+    "晚上",
+    "最近",
+    "现在",
+    "有点",
+    "有些",
+]);
+
+const extractDesiredIngredients = (text: string): string[] => {
+    const phraseMatch = text.match(
+        /(?:今天|今晚|明天|现在|最近|我)?(?:特别|有点|有些)?(?:想吃|想要|想来点|想来份|来点|来份)([^。！？!?,，]+)/,
+    );
+
+    const source = phraseMatch?.[1] || text;
+    const cleaned = source
+        .replace(/[。！？!?]/g, " ")
+        .replace(/心想食材|心选食材/g, " ")
+        .replace(/(帮我|请|把|给我|一下|设置成|设置为|标记为|标记成)/g, " ")
+        .replace(/(添加|加入|删除|移除|去掉|清空|查看|打开|进入)/g, " ")
+        .replace(/(我想吃|想吃|想要|我想要|来点|来份|想来点|想来份)/g, " ")
+        .replace(/(今天|今晚|明天|中午|早上|下午|晚上|最近|现在)/g, " ")
+        .trim();
+
+    return cleaned
+        .split(/[\s,，、和及]+/)
+        .map((part) => normalizeIngredientName(part).replace(/食材/g, "").trim())
+        .filter(
+            (part) =>
+                part.length > 0 &&
+                !desiredIngredientStopWords.has(part) &&
+                /[\u4e00-\u9fa5A-Za-z]/.test(part),
+        );
+};
+
+const extractDislikedIngredients = (text: string): string[] => {
+    const cleaned = text
+        .replace(/[。！？!?]/g, " ")
+        .replace(/(心想食材|心选食材)/g, " ")
+        .replace(/(我|真的|最近|现在|暂时|先|都|也|再也)/g, " ")
+        .replace(/(不想吃|不吃|不要吃|别吃|不想要|不要|别要)/g, " ")
+        .replace(/(了|啦|啊|呀|吧|嘛)/g, " ")
+        .trim();
+
+    return cleaned
+        .split(/[\s,，、和及]+/)
+        .map((part) => normalizeIngredientName(part).replace(/食材/g, "").trim())
+        .filter(
+            (part) =>
+                part.length > 0 &&
+                !desiredIngredientStopWords.has(part) &&
+                /[\u4e00-\u9fa5A-Za-z]/.test(part),
+        );
+};
+
 export default function VoiceAssistant() {
     const navigate = useNavigate();
     const location = useLocation();
-    const { ingredients, setIngredients } = useIngredientsStore();
+    const {
+        ingredients,
+        desiredIngredients,
+        setIngredients,
+        addDesiredIngredient,
+        removeDesiredIngredient,
+        setDesiredIngredients,
+    } = useIngredientsStore();
     const { setRecommendations } = useRecipesStore();
     const { preferences } = useUserStore();
 
@@ -374,6 +469,7 @@ export default function VoiceAssistant() {
         try {
             const recipes = await recipeApi.getRecommendations({
                 available_ingredients: names,
+                required_ingredients: desiredIngredients,
                 taste_preferences:
                     preferences.tastePreferences as TastePreference[],
                 diet_type: (preferences.dietType || undefined) as
@@ -463,11 +559,6 @@ export default function VoiceAssistant() {
             return;
         }
 
-        if (/推荐菜谱|推荐做什么|吃什么|推荐一下/.test(normalized)) {
-            await recommendRecipes();
-            return;
-        }
-
         if (/采购清单|需要哪些食材|买菜/.test(normalized)) {
             const dishName = extractDishName(userText);
             const itemList = dishIngredientMap[dishName] || [];
@@ -497,8 +588,80 @@ export default function VoiceAssistant() {
             return;
         }
 
+        if (/查看|打开|进入/.test(normalized) && /心想食材|心选食材/.test(normalized)) {
+            navigate("/food/desired");
+            const msg = "已为你打开心想食材页面。";
+            appendMessage("assistant", msg);
+            speak(msg);
+            return;
+        }
+
+        if (/不想吃|不吃|不要吃|别吃/.test(normalized)) {
+            const items = extractDislikedIngredients(userText);
+            if (!items.length) {
+                const msg = "我没有识别到你不想吃的食材，请再说一次。";
+                appendMessage("assistant", msg);
+                speak(msg);
+                return;
+            }
+
+            items.forEach((item) => removeDesiredIngredient(item));
+            const msg = `明白了，已从心想食材移除：${items.join("、")}。`;
+            appendMessage("assistant", msg);
+            speak(msg);
+            return;
+        }
+
+        if (/清空/.test(normalized) && /心想食材|心选食材/.test(normalized)) {
+            setDesiredIngredients([]);
+            const msg = "已清空你的心想食材。";
+            appendMessage("assistant", msg);
+            speak(msg);
+            return;
+        }
+
+        if (/删除|移除|去掉/.test(normalized) && /心想食材|心选食材/.test(normalized)) {
+            const items = extractDesiredIngredients(userText);
+            if (!items.length) {
+                const msg = "我没有识别到要删除的心想食材，请再说一次。";
+                appendMessage("assistant", msg);
+                speak(msg);
+                return;
+            }
+
+            items.forEach((item) => removeDesiredIngredient(item));
+            const msg = `已为你移除心想食材：${items.join("、")}。`;
+            appendMessage("assistant", msg);
+            speak(msg);
+            return;
+        }
+
+        if (
+            /心想食材|心选食材/.test(normalized) ||
+            (/想吃/.test(normalized) && !/需要哪些食材|采购清单|买菜/.test(normalized))
+        ) {
+            const items = extractDesiredIngredients(userText);
+            if (!items.length) {
+                const msg = "我没有识别到心想食材，请再说一次。";
+                appendMessage("assistant", msg);
+                speak(msg);
+                return;
+            }
+
+            items.forEach((item) => addDesiredIngredient(item));
+            const msg = `好的，已添加到心想食材：${items.join("、")}。`;
+            appendMessage("assistant", msg);
+            speak(msg);
+            return;
+        }
+
+        if (/推荐菜谱|推荐做什么|吃什么|推荐一下/.test(normalized)) {
+            await recommendRecipes();
+            return;
+        }
+
         const fallback =
-            "我可以帮你：添加库存、推荐菜谱、添加采购清单。请再说一次具体需求。";
+            "我可以帮你：添加库存、管理心想食材、推荐菜谱、添加采购清单。请再说一次具体需求。";
         appendMessage("assistant", fallback);
         speak(fallback);
     };
@@ -581,7 +744,7 @@ export default function VoiceAssistant() {
                 )}
 
                 {isPanelOpen && (
-                    <div className="absolute top-full right-0 mt-2 w-full md:max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden z-50 animate-slide-up">
+                    <div className="absolute top-full right-0 mt-2 w-full bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden z-50 animate-slide-up">
                         <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-gray-50">
                             <div className="flex items-center space-x-2">
                                 <Mic size={18} className="text-primary-600" />

@@ -1,6 +1,6 @@
 import {useEffect, useMemo, useState} from 'react';
 import {Link, useNavigate} from 'react-router-dom';
-import {AlertTriangle, Carrot, Check, Plus, ScanLine, ShoppingCart, Trash2, X} from 'lucide-react';
+import {AlertTriangle, Carrot, Check, Heart, Plus, ScanLine, ShoppingCart, Trash2, X} from 'lucide-react';
 
 import {ingredientApi} from '../services/api';
 import {useIngredientsStore, useRecipesStore} from '../stores';
@@ -40,7 +40,13 @@ const categoryColors: Record<string, string> = {
 
 export default function FoodPage() {
   const navigate = useNavigate();
-  const {ingredients, addIngredient, removeIngredient, setIngredients, clearIngredients} =
+  const {
+    ingredients,
+    addIngredient,
+    removeIngredient,
+    setIngredients,
+    clearIngredients,
+  } =
       useIngredientsStore();
   const {clearRecommendations} = useRecipesStore();
 
@@ -113,7 +119,7 @@ export default function FoodPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Link
             to="/scan"
             className="card p-5 border-2 border-transparent hover:border-primary-500 transition-colors"
@@ -138,6 +144,20 @@ export default function FoodPage() {
             </div>
             <div>
               <h2 className="font-semibold text-gray-800">查看采购清单</h2>
+            </div>
+          </div>
+        </Link>
+
+        <Link
+            to="/food/desired"
+            className="card p-5 border-2 border-transparent hover:border-purple-400 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center">
+              <Heart size={22}/>
+            </div>
+            <div>
+              <h2 className="font-semibold text-gray-800">我的心想食材</h2>
             </div>
           </div>
         </Link>
