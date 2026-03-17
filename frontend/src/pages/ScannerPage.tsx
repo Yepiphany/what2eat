@@ -663,7 +663,7 @@ export default function ScannerPage() {
               </div>
               <h3 className="text-xl font-bold text-gray-800 mb-2">食材已更改</h3>
               <p className="text-gray-600">
-                您的食材库存已更新，是否要重新生成菜谱推荐？
+                您的食材库存已更新，是否要生成推荐菜谱？
               </p>
             </div>
             <div className="flex space-x-3">
@@ -681,7 +681,7 @@ export default function ScannerPage() {
                 }}
                 className="flex-1 px-6 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors"
               >
-                重新推荐
+                推荐菜谱
               </button>
             </div>
           </div>
