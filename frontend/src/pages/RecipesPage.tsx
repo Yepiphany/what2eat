@@ -8,6 +8,7 @@ import { getUserId } from '../utils/userId';
 import {
   clearRecipeCacheDirty,
   consumeRecipeForceRefreshRequest,
+  hasRecipeForceRefreshRequest,
   isRecipeCacheDirty,
 } from '../services/recipeCache';
 
@@ -23,7 +24,9 @@ export default function RecipesPage() {
   const [showFetchErrorDialog, setShowFetchErrorDialog] = useState(false);
   const [hasInitialLoad, setHasInitialLoad] = useState(false);
   const [isLoadingFromDb, setIsLoadingFromDb] = useState(false);
-  const [isFirstTimeLoading, setIsFirstTimeLoading] = useState(true);
+  const [isFirstTimeLoading, setIsFirstTimeLoading] = useState(
+    () => hasRecipeForceRefreshRequest() || isRecipeCacheDirty(),
+  );
   // isInitialLoadRef removed as it was unused
 
   const { ingredients, desiredIngredients } = useIngredientsStore();
@@ -131,17 +134,16 @@ export default function RecipesPage() {
       consumeRecipeForceRefreshRequest() || isRecipeCacheDirty();
     if (shouldForceRefresh) {
       console.log('[DEBUG] 检测到强制刷新标志，执行 forceRefresh');
+      clearRecipeCacheDirty();
       
       const loadData = async () => {
-        console.log('[DEBUG] 强制刷新 - 先加载数据库数据');
+        console.log('[DEBUG] 强制刷新 - 直接请求新菜谱，避免旧结果闪现');
         hasLoadedRef.current = true;
         lastContextKeyRef.current = recommendationContextKey;
-        const loadedPageCount = await loadFromDatabase(cacheContextIngredients);
-        console.log('[DEBUG] 数据库加载完成，加载了', loadedPageCount, '页');
-        // 然后获取新菜谱
-        fetchRecipes([], true);
+        setIsFirstTimeLoading(true);
+        await fetchRecipes([], true);
       };
-      loadData();
+      void loadData();
       return;
     }
     
@@ -180,18 +182,18 @@ export default function RecipesPage() {
       console.log('[DEBUG] 数据库加载完成，加载了', loadedPageCount, '页, 类型:', typeof loadedPageCount);
       setHasInitialLoad(true);
       setIsLoadingFromDb(false);
-      setIsFirstTimeLoading(false);
       
       // 如果数据库中没有数据，则获取新菜谱
       console.log('[DEBUG] 检查是否需要获取新菜谱: loadedPageCount=', loadedPageCount, ', 条件:', loadedPageCount === 0);
       if (loadedPageCount === 0) {
         console.log('[DEBUG] 数据库无数据，获取新菜谱, hasLoadedRef=', hasLoadedRef.current);
-        fetchRecipes([], false);
+        await fetchRecipes([], false);
       } else {
         console.log('[DEBUG] 数据库已有数据，跳过获取新菜谱');
+        setIsFirstTimeLoading(false);
       }
     };
-    loadData();
+    void loadData();
   // 依赖 availableIngredientNames 数组本身，而不仅仅是长度
   // 但使用 hasLoadedRef 和 hasInitialLoad 来防止重复加载
   // eslint-disable-next-line react-hooks/exhaustive-deps

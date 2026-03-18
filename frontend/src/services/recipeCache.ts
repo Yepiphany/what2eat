@@ -25,6 +25,10 @@ export function requestRecipeForceRefresh(): void {
   sessionStorage.setItem(FORCE_REFRESH_RECIPES_KEY, 'true');
 }
 
+export function hasRecipeForceRefreshRequest(): boolean {
+  return sessionStorage.getItem(FORCE_REFRESH_RECIPES_KEY) === 'true';
+}
+
 export function consumeRecipeForceRefreshRequest(): boolean {
   const shouldRefresh =
       sessionStorage.getItem(FORCE_REFRESH_RECIPES_KEY) === 'true';
