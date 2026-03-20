@@ -44,6 +44,8 @@
 
 “栗子记忆”不是简单收藏夹，而是面向长期陪伴的用户饮食档案系统。它把用户偏好、目标与行为沉淀为结构化记忆，让推荐从“这次能做什么”升级为“长期更适合你什么”。
 
+![memory](/asset/memory.png)
+
 **记忆内容结构**：
 
 - **收藏记忆**：用户收藏过的菜谱快照（`favorite_recipes`）
@@ -165,7 +167,7 @@ https://modelscope.cn/studios/shinnn/What2Eat/
 - 我的页：用户信息、偏好设置、**栗子记忆**
 - 顶部语音助手常驻
 
-<img src="asset/recipepage.png" alt="Recipe Page" style="zoom: 33%;" />
+<img src="asset/recipepage.png" alt="Recipe Page" style="" />
 
 #### 偏好管理与接口封装
 
@@ -175,8 +177,6 @@ https://modelscope.cn/studios/shinnn/What2Eat/
 #### 细节体验优化
 
 - 支持响应式布局
-
-  <img src="asset/responsive.png" alt="Responsive" style="width:33%;" />
 
 - 主页卡片 Hover 边框抖动问题：
 
@@ -313,7 +313,7 @@ def get_supabase_client() -> Client:
   - 展示库存与采购摘要，帮助用户快速判断“今天能做什么”
   - 卡片交互强调“行动入口”与“信息展示”分层，降低认知负担
 
-  <img src="asset/entry.png" alt="Entry" style="zoom: 33%;" />
+  <img src="asset/homepage.png" alt="Entry" style="" />
 
   #### 3.2 食材（`/food`）
 
@@ -334,7 +334,7 @@ def get_supabase_client() -> Client:
   | 清空清单          | 快速重置采购任务       |
   | 菜谱关联          | 每个采购项关联来源菜谱 |
 
-  <img src="asset/shoppingpage.png" alt="Shopping Page" style="zoom: 33%;" />
+  <img src="asset/shoppingpage.png" alt="Shopping Page" />
 
   #### 3.3 扫描（`/scan`）
 
@@ -351,9 +351,9 @@ def get_supabase_client() -> Client:
   拍摄/上传图片 → AI分析识别 → 展示识别结果 → 用户确认/编辑 → 保存至库存
   ```
 
-  <img src="asset/scanningpage.png" alt="Scanning Page" style="zoom: 33%;" />
+  <img src="asset/scanningpage.png" alt="Scanning Page"  />
   <img src="asset/scanningresult.png" alt="Scanning Result" style="zoom: 33%;" />
-  <img src="asset/inventorypage.png" alt="Inventory Page" style="zoom: 33%;" />
+  <img src="asset/inventorypage.png" alt="Inventory Page"  />
 
   #### 3.4 烹饪（`/cook`）
 
