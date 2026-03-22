@@ -4,7 +4,7 @@
 
 ### **What2Eat 今天吃什么** 是一款面向家庭与个人的**一站式AI 智能饮食决策助手**，聚焦于日常生活中高频真实问题——**“今天吃什么？”**。
 
-
+<img src="asset/homepage.png" alt="Home Page" style="width: 50%; margin: auto; display: block;" />
 
 ### 亮点功能
 
@@ -44,7 +44,7 @@
 
 “栗子记忆”不是简单收藏夹，而是面向长期陪伴的用户饮食档案系统。它把用户偏好、目标与行为沉淀为结构化记忆，让推荐从“这次能做什么”升级为“长期更适合你什么”。
 
-![memory](/asset/memory.png)
+<img src="asset/memory.png" alt="Memory" style="width: 50%; margin: auto; display: block;" />
 
 **记忆内容结构**：
 
@@ -71,7 +71,7 @@
 
 项目目标并非“做一个菜谱大全”，而是通过 AI 将饮食决策从模糊、纠结、浪费，转变为可执行、可持续、可扩展的智能流程。
 
-<img src="asset/homepage.png" alt="Home Page" style="margin: auto; display: block;" />
+ <video src="asset/今天吃什么demo.mp4" controls="" style="width: 50%"></video>
 
 ### 创意来源
 
@@ -167,7 +167,7 @@ https://modelscope.cn/studios/shinnn/What2Eat/
 - 我的页：用户信息、偏好设置、**栗子记忆**
 - 顶部语音助手常驻
 
-<img src="asset/recipepage.png" alt="Recipe Page" style="" />
+<img src="asset/recipepage.png" alt="Recipe Page" style="width: 50%" />
 
 #### 偏好管理与接口封装
 
@@ -313,7 +313,7 @@ def get_supabase_client() -> Client:
   - 展示库存与采购摘要，帮助用户快速判断“今天能做什么”
   - 卡片交互强调“行动入口”与“信息展示”分层，降低认知负担
 
-  <img src="asset/homepage.png" alt="Entry" style="" />
+  <img src="asset/homepage.png" alt="Entry" style="width: 50%" />
 
   #### 3.2 食材（`/food`）
 
@@ -334,7 +334,7 @@ def get_supabase_client() -> Client:
   | 清空清单          | 快速重置采购任务       |
   | 菜谱关联          | 每个采购项关联来源菜谱 |
 
-  <img src="asset/shoppingpage.png" alt="Shopping Page" />
+  <img src="asset/shoppingpage.png" alt="Shopping Page" style="width: 50%"/>
 
   #### 3.3 扫描（`/scan`）
 
@@ -351,21 +351,25 @@ def get_supabase_client() -> Client:
   拍摄/上传图片 → AI分析识别 → 展示识别结果 → 用户确认/编辑 → 保存至库存
   ```
 
-  <img src="asset/scanningpage.png" alt="Scanning Page"  />
+  <img src="asset/scanningpage.png" alt="Scanning Page"  style="width: 50%; margin: auto"/>
+  
   <img src="asset/scanningresult.png" alt="Scanning Result" style="zoom: 33%;" />
-  <img src="asset/inventorypage.png" alt="Inventory Page"  />
+
+  <img src="asset/inventorypage.png" alt="Inventory Page" style="width: 50%; margin: auto" />
+
+  
 
   #### 3.4 烹饪（`/cook`）
-
+  
   烹饪页是决策与执行中枢，统一承载推荐、收藏、历史等标签能力：
-
+  
   - 推荐页按饮食规则生成多道候选菜（如均衡饮食下 2 荤 2 素 1 汤）
   - 支持“不合胃口”生成新页并保留历史页，实现可回溯决策
   - 支持缺口食材一键加入采购清单，形成跨页闭环
   - 进入菜谱详情后可启动烹饪会话，按步骤引导执行并配合计时
-
+  
   **推荐结果核心交互**：
-
+  
   | 操作       | 功能                     |
   | ---------- | ------------------------ |
   | 不合胃口？ | 生成新一页推荐并保留历史 |
@@ -373,16 +377,16 @@ def get_supabase_client() -> Client:
   | 分页导航   | 切换历史推荐页           |
   | 查看详情   | 进入单菜谱详情           |
   | 开始烹饪   | 进入步骤引导与计时模式   |
-
+  
   <img src="asset/recipepage-2.png" alt="Recipe Page" style="zoom: 33%;" />
   <img src="asset/recipecard.png" alt="Recipe Card" style="zoom: 33%;" />
   <img src="asset/eliminatingwindow.png" alt="Eliminating Window" style="width: 33%;" />
   <img src="asset/cookingpage.png" alt="Cooking Page" style="zoom: 33%;" />
 
   #### 3.5 我的（`/profile`）
-
+  
   个人页聚合“身份信息 + 偏好设置 + 记忆档案”：
-
+  
   - 维护口味偏好、饮食类型、最大烹饪时间、烹饪水平
   - 展示统计信息（如扫描次数、查看菜谱、烹饪记录）
   - 管理“栗子记忆”（收藏、历史、临时目标、长期目标）
@@ -391,18 +395,18 @@ def get_supabase_client() -> Client:
   <img src="asset/profilepage-2.png" alt="Profile Page" style="zoom: 33%;" />
 
   ### 4. 全局语音交互（跨页面能力）
-
+  
   语音助手“栗子”在任意主页面均可调用，支持：
-
+  
   - 语音入库（食材名/数量/单位解析）
   - 心想食材管理（添加/移除/清空/跳转）
   - 目标管理（临时目标与长期目标增删）
   - 一键触发推荐、临期问答、采购辅助
 
   其价值在于将“输入成本”从手动编辑降为自然表达，提升移动端与厨房场景可用性。
-
+  
   ### 5. 错误处理与兜底体验
-
+  
   - 数据库不可用时提供非阻塞提示
   - 偏好或记忆保存失败时优先本地可用，恢复后再同步
   - 保障“核心流程不断裂”：即使弱网或无云端配置，仍可完成主链路体验
